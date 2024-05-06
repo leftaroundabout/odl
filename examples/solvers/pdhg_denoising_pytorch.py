@@ -11,6 +11,7 @@ https://odlgroup.github.io/odl/guide/pdhg_guide.html in the ODL documentation.
 """
 
 import numpy as np
+import torch
 import scipy.misc
 import odl
 
@@ -23,16 +24,13 @@ shape = image.shape
 image /= image.max()
 
 # Discretized spaces
-space = odl.uniform_discr([0, 0], shape, shape)
+space = odl.uniform_discr([0, 0], shape, shape, impl='pytorch')
 
 # Original image
 orig = space.element(image.copy())
 
 # Add noise
-image += 0.1 * odl.phantom.white_noise(orig.space)
-
-# Data of noisy image
-noisy = space.element(image)
+noisy = space.element(image) + 0.1 * odl.phantom.white_noise(orig.space)
 
 # Gradient operator
 gradient = odl.Gradient(space)
@@ -60,8 +58,8 @@ f = odl.solvers.IndicatorNonnegativity(op.domain)
 # --- Select solver parameters and solve using PDHG --- #
 
 # Estimated operator norm, add 10 percent to ensure ||K||_2^2 * sigma * tau < 1
-op_norm = 1.1 * odl.power_method_opnorm(op, xstart=noisy)
-print(f"{op_norm=}")
+op_norm = 3.2833764101732785
+          # 1.1 * odl.power_method_opnorm(op, xstart=noisy, maxiter=6)
 
 niter = 200  # Number of iterations
 tau = 1.0 / op_norm  # Step size for the primal variable
@@ -73,6 +71,8 @@ callback = (odl.solvers.CallbackPrintIteration() &
 
 # Starting point
 x = op.domain.zero()
+
+print("Go solve...")
 
 # Run algorithm (and display intermediates)
 odl.solvers.pdhg(x, f, g, op, niter=niter, tau=tau, sigma=sigma,

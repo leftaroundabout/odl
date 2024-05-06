@@ -772,6 +772,10 @@ class DiscretizedSpaceElement(Tensor):
         self.tensor.__ipow__(p)
         return self
 
+    def __rmul__(self, μ):
+        """Implement ``μ * self``."""
+        return self.space.element(μ * self.tensor)
+
     @property
     def real(self):
         """Real part of this element.
@@ -1131,6 +1135,10 @@ class DiscretizedSpaceElement(Tensor):
         .. _reduceat documentation:
            https://docs.scipy.org/doc/numpy/reference/generated/\
         """
+        
+        if (self.impl == "pytorch"):
+            return NotImplemented
+
         # --- Process `out` --- #
 
         # Unwrap out if provided. The output parameters are all wrapped

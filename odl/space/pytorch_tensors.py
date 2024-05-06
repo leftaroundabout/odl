@@ -419,7 +419,8 @@ class PytorchTensorSpace(TensorSpace):
             raise ValueError(f"Only row-major order supported ('C'), not '{order}'.")
 
         if inp is None and data_ptr is None:
-            arr = torch.empty(self.shape, dtype=self._torch_dtype)
+            # arr = torch.empty(self.shape, dtype=self._torch_dtype)
+            arr = torch.zeros(self.shape, dtype=self._torch_dtype)
 
             return self.element_type(self, arr)
 
@@ -860,6 +861,7 @@ class PytorchTensor(Tensor):
         """Initialize a new instance."""
         Tensor.__init__(self, space)
         self.__data = data
+        self._enforce_nan_regulation()
 
     @property
     def data(self):
@@ -908,7 +910,12 @@ class PytorchTensor(Tensor):
             return self.data
         else:
             out[:] = self.data
+            out._enforce_nan_regulation()
             return out
+
+    def _enforce_nan_regulation(self):
+        if Tensor._prohibit_nans:
+            assert(not(torch.isnan(self.__data).any()))
 
     def astype(self, dtype):
         """Return a copy of this element with new ``dtype``.
@@ -1194,6 +1201,8 @@ class PytorchTensor(Tensor):
 
         self.data[indices] = values
 
+        self._enforce_nan_regulation()
+
     @property
     def real(self):
         """Real part of ``self``.
@@ -1252,6 +1261,8 @@ class PytorchTensor(Tensor):
             Values to be assigned to the real part of this element.
         """
         self.real.data[:] = newreal
+
+        self._enforce_nan_regulation()
 
     @property
     def imag(self):
@@ -1319,6 +1330,8 @@ class PytorchTensor(Tensor):
             raise ValueError('cannot set imaginary part in real spaces')
         self.imag.data[:] = newimag
 
+        self._enforce_nan_regulation()
+
     def conj(self, out=None):
         """Return the complex conjugate of ``self``.
 
@@ -1367,24 +1380,35 @@ class PytorchTensor(Tensor):
                                       'dtype {}'.format(self.dtype))
 
         if out is None:
-            return self.space.element(self.data.conj())
+            result = self.space.element(self.data.conj())
+            result._enforce_nan_regulation()
+            return result
         else:
             if out not in self.space:
                 raise LinearSpaceTypeError('`out` {!r} not in space {!r}'
                                            ''.format(out, self.space))
             self.data.conj(out.data)
+            out._enforce_nan_regulation()
             return out
 
     def __ipow__(self, other):
         """Return ``self **= other``."""
         try:
             if other == int(other):
-                return super(PytorchTensor, self).__ipow__(other)
+                super(PytorchTensor, self).__ipow__(other)
+                self._enforce_nan_regulation()
+                return self 
         except TypeError:
             pass
 
         torch.pow(self.data, other, out=self.data)
+        self._enforce_nan_regulation()
         return self
+
+    def __rmul__(self, other):
+        result = self.space.element(other * self.data)
+        result._enforce_nan_regulation()
+        return result
 
     def __int__(self):
         """Return ``int(self)``."""

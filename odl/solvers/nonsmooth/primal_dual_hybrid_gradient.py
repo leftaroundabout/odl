@@ -16,6 +16,7 @@ from __future__ import print_function, division, absolute_import
 import numpy as np
 
 from odl.operator import Operator
+from odl.space.base_tensors import nan_free_tensors
 
 
 __all__ = ('pdhg', 'pdhg_stepsize')
@@ -275,7 +276,9 @@ def pdhg(x, f, g, L, niter, tau=None, sigma=None, **kwargs):
         # Apply the dual proximal
         if not proximal_constant:
             proximal_dual_sigma = proximal_dual(sigma)
-        proximal_dual_sigma(dual_tmp, out=y)
+        with nan_free_tensors():
+            proximal_dual_sigma(dual_tmp, out=y)
+        print(f"{y=}")
 
         # Gradient descent in the primal variable x
         # Compute primal_tmp = x + (- tau) * L.derivative(x).adjoint(y)

@@ -10,6 +10,8 @@
 
 from __future__ import absolute_import, division, print_function
 
+from contextlib import contextmanager
+
 from numbers import Integral
 
 import numpy as np
@@ -505,6 +507,8 @@ class TensorSpace(LinearSpace):
 
 class Tensor(LinearSpaceElement):
 
+    _prohibit_nans = False
+
     """Abstract class for representation of `TensorSpace` elements."""
 
     def asarray(self, out=None):
@@ -667,6 +671,12 @@ class Tensor(LinearSpaceElement):
             return np.array(self.asarray())
         else:
             return np.array(self.asarray()).astype(dtype, copy=False)
+
+    def has_nan(self) -> bool:
+        """Return True if any of the entries are floating-point NaNs. (If this
+        happens then there is typically no point carrying out further
+        computations, as NaN is poisonous and will soon appear everywhere.)"""
+        return np.isnan(self.__array__()).any()
 
     def __array_wrap__(self, array):
         """Return a new tensor wrapping the ``array``.
@@ -992,6 +1002,18 @@ numpy.ufunc.reduceat.html
 
         return show_discrete_data(values, grid, title=title, method=method,
                                   force_show=force_show, fig=fig, **kwargs)
+
+@contextmanager
+def nan_free_tensors():
+    """Turns NaNs into signalling NaNs. If NaN entries turn up in any
+    calculation within this context, an exception will be raised."""
+
+    previous_prohibitation = Tensor._prohibit_nans
+    Tensor._prohibit_nans = True
+    try:
+        yield None
+    finally:
+        Tensor._prohibit_nans = previous_prohibitation
 
 
 if __name__ == '__main__':

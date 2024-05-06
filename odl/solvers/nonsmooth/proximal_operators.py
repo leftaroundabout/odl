@@ -391,7 +391,7 @@ def proximal_quadratic_perturbation(prox_factory, a, u=None):
             return (MultiplyOperator(const, domain=u.space, range=u.space) *
                     prox *
                     (MultiplyOperator(const, domain=u.space, range=u.space) -
-                     sigma * const * u))
+                     u.space.as_suitable_scalar(sigma * const) * u))
         else:
             space = prox.domain
             return (MultiplyOperator(const, domain=space, range=space) *
@@ -1003,6 +1003,9 @@ def proximal_l2_squared(space, lam=1, g=None):
                         out.lincomb(1, x, 1, out)
                     out.divide(1 + 2 * sig * lam, out=out)
 
+        def has_nan(self) -> bool:
+            return np.isnan(self.sigma).any()
+
     return ProximalL2Squared
 
 
@@ -1130,6 +1133,9 @@ def proximal_convex_conj_l1(space, lam=1, g=None):
 
             # out = diff / ...
             diff.divide(out, out=out)
+
+        def has_nan(self) -> bool:
+            return np.isnan(self.sigma).any()
 
     return ProximalConvexConjL1
 

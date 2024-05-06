@@ -529,6 +529,12 @@ class ProductSpaceOperator(Operator):
             aslist[i][j] = op
         return '{}({!r})'.format(self.__class__.__name__, aslist)
 
+    def has_nan(self) -> bool:
+        for op in self.__ops.data:
+            if op.has_nan():
+                return True
+        return False
+
 
 class ComponentProjection(Operator):
 
@@ -817,7 +823,10 @@ class BroadcastOperator(Operator):
     def _call(self, x, out=None):
         """Evaluate all operators in ``x`` and broadcast."""
         wrapped_x = self.prod_op.domain.element([x], cast=False)
-        return self.prod_op(wrapped_x, out=out)
+        result = self.prod_op(wrapped_x, out=out)
+        assert(not out.has_nan())
+        assert(result is out)
+        return result
 
     def derivative(self, x):
         """Derivative of the broadcast operator.

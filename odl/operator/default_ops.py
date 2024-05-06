@@ -20,6 +20,7 @@ from odl.operator.operator import Operator
 from odl.set import ComplexNumbers, Field, LinearSpace, RealNumbers
 from odl.set.space import LinearSpaceElement
 from odl.space import ProductSpace
+from odl.space.base_tensors import Tensor
 
 __all__ = ('ScalingOperator', 'ZeroOperator', 'IdentityOperator',
            'LinCombOperator', 'MultiplyOperator', 'PowerOperator',
@@ -320,13 +321,14 @@ class MultiplyOperator(Operator):
 
     def _call(self, x, out=None):
         """Multiply ``x`` and write to ``out`` if given."""
+        μ = x.space.as_suitable_scalar(self.multiplicand)
         if out is None:
-            return x * self.multiplicand
+            return x * μ
         elif not self.__range_is_field:
             if self.__domain_is_field:
-                out.lincomb(x, self.multiplicand)
+                out.lincomb(x, μ)
             else:
-                out.assign(self.multiplicand * x)
+                out.assign(μ * x)
         else:
             raise ValueError('can only use `out` with `LinearSpace` range')
 
@@ -396,6 +398,12 @@ class MultiplyOperator(Operator):
     def __str__(self):
         """Return ``str(self)``."""
         return "x * {}".format(self.y)
+
+    def has_nan(self) -> bool:
+        if isinstance(self.multiplicand, Tensor):
+            return self.multiplicand.has_nan()
+        else:
+            return np.isnan(self.multiplicand).any()
 
 
 class PowerOperator(Operator):

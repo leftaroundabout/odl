@@ -684,6 +684,7 @@ class Operator(object):
                                 'when range is a field')
 
             result = self._call_in_place(x, out=out, **kwargs)
+            assert(not out.has_nan())
             if result is not None and result is not out:
                 raise ValueError('`op` returned a different value than `out`. '
                                  'With in-place evaluation, the operator can '
@@ -1313,6 +1314,9 @@ class OperatorVectorSum(Operator):
         """Return ``str(self)``."""
         return '({} + {})'.format(self.left, self.right)
 
+    def has_nan(self) -> bool:
+        return self.operator.has_nan() or self.vector.has_nan()
+
 
 class OperatorComp(Operator):
 
@@ -1450,6 +1454,9 @@ class OperatorComp(Operator):
     def __str__(self):
         """Return ``str(self)``."""
         return '{} o {}'.format(self.left, self.right)
+
+    def has_nan(self) -> bool:
+        return self.left.has_nan() or self.right.has_nan()
 
 
 class OperatorPointwiseProduct(Operator):

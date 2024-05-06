@@ -1497,6 +1497,19 @@ class ProductSpaceElement(LinearSpaceElement):
 
         return tuple(figs)
 
+    def __rmul__(self, other):
+        if self.space.is_suitable_scalar(other):
+            return self.space.element([other*part for part in self.parts])
+        else:
+            raise TypeError("Only multiplication with suitable scalar supported for product spaces.")
+
+    def has_nan(self) -> bool:
+        for part in self.parts:
+            if part.has_nan():
+                return True
+        return False
+
+
 
 # --- Add arithmetic operators that broadcast --- #
 
