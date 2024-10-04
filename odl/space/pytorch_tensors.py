@@ -82,6 +82,7 @@ class PytorchTensorSpace(TensorSpace):
             Number of entries per axis for elements in this space. A
             single integer results in a space with rank 1, i.e., 1 axis.
         dtype :
+            # TODO this is not really how dtypes work in PyTorch
             Data type of each element. Can be provided in any
             way the `torch.dtype` function understands, e.g.
             as built-in type or as a string. For ``None``,

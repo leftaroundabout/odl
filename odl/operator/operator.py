@@ -55,6 +55,7 @@ def _default_call_out_of_place(op, x, **kwargs):
         evaluation.
     """
     out = op.range.element()
+    print(f"{out.dtype=}")
     result = op._call_in_place(x, out, **kwargs)
     if result is not None and result is not out:
         raise ValueError('`op` returned a different value than `out`.'

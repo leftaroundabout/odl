@@ -11,6 +11,7 @@
 from __future__ import absolute_import, division, print_function
 
 import numpy as np
+import torch
 
 from odl.discr import (
     DiscretizedSpace, uniform_discr_frompartition, uniform_grid,
@@ -294,6 +295,15 @@ def dft_preprocess_data(arr, shift=True, axes=None, sign='-', out=None):
     type and ``shift`` is not ``True``. In this case, the return type
     is the complex counterpart of ``arr.dtype``.
     """
+
+    if isinstance(arr, torch.Tensor):
+        # TODO proper PyTorch implementation
+        if out is None:
+            return torch.tensor(dft_preprocess_data(np.asarray(arr), shift=shift, axes=axes, sign='-'))
+        else:
+            assert(isinstance(out, torch.Tensor)), f"{type(out)=}"
+            out[:] = torch.tensor(dft_preprocess_data(np.asarray(arr), shift=shift, axes=axes, sign='-'))
+
     arr = np.asarray(arr)
     if not is_numeric_dtype(arr.dtype):
         raise ValueError('array has non-numeric data type {}'
@@ -458,6 +468,28 @@ def dft_postprocess_data(arr, real_grid, recip_grid, shift, axes,
     *Numerical Recipes in C - The Art of Scientific Computing* (Volume 3).
     Cambridge University Press, 2007.
     """
+
+    allowed_dtypes = map(np.dtype, ['float64', 'complex128'])
+
+    if isinstance(arr, torch.Tensor):
+        # TODO proper PyTorch implementation
+        all_args = { 'real_grid': real_grid,
+                    'recip_grid': recip_grid,
+                    'shift': shift,
+                    'axes': axes,
+                    'interp': interp,
+                    'sign': sign,
+                    'op': op }
+        arr_np = np.asarray(arr)
+        assert(arr_np.dtype in allowed_dtypes), f"{arr_np.dtype=}"
+        if out is None:
+            return torch.tensor(dft_postprocess_data(arr_np, **all_args))
+        else:
+            out[:] = torch.tensor(dft_postprocess_data(arr_np, **all_args))
+            return out
+    else:
+        assert(arr.dtype in allowed_dtypes), f"{arr.dtype=}"
+
     arr = np.asarray(arr)
     if is_real_floating_dtype(arr.dtype):
         arr = arr.astype(complex_dtype(arr.dtype))
@@ -616,7 +648,7 @@ def reciprocal_space(space, axes=None, halfcomplex=False, shift=True,
             raise ValueError('{} is not a complex data type'
                              ''.format(dtype_repr(dtype)))
 
-    impl = kwargs.pop('impl', 'numpy')
+    impl = kwargs.pop('impl', space.impl)
 
     # Calculate range
     recip_grid = reciprocal_grid(space.grid, shift=shift,
