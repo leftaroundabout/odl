@@ -34,18 +34,26 @@ if __name__ == '__main__':
             sys.exit(f'No "{key}" key in the metadata_dict')
 
     ### load backend module
-    if benchmark_dict['backend'] == 'odl':
+    match benchmark_dict['backend']:
+      case 'odl':
         import scripts.odl_scripts as sc
         DEVICE = 'cpu'
 
-    elif benchmark_dict['backend'] == 'torch':
+      case 'torch':
         import scripts.torch_scripts as sc
         try:
             DEVICE = metadata_dict['parameters']['device_name']
         except ValueError:
             DEVICE = 'cpu'
 
-    else:
+      case 'odltorch':
+        import scripts.odltorch_scripts as sc
+        try:
+            DEVICE = metadata_dict['parameters']['device_name']
+        except ValueError:
+            DEVICE = 'cpu'
+
+      case _:
         raise NotImplementedError(f'''Backend {benchmark_dict["backend"]} not supported, only
                                   "odl" and "torch"''')
 
