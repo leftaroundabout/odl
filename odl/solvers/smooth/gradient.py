@@ -174,7 +174,7 @@ def adam(f, x, learning_rate=1e-3, beta1=0.9, beta2=0.999, eps=1e-8,
 
         step = learning_rate * np.sqrt(1 - beta2) / (1 - beta1)
 
-        x.lincomb(1, x, -step, m / (np.sqrt(v) + eps))
+        x.lincomb(1, x, -step, m / (v.ufuncs.sqrt() + eps))
 
         if callback is not None:
             callback(x)
