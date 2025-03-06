@@ -236,13 +236,13 @@ class AstraCudaImpl:
             if self.geometry.ndim == 2:
                 out[:] = self.proj_array
             elif self.geometry.ndim == 3:
-                # TODO: Find a way not to have to do rollaxis(0, 3) for
+                # TODO: Find a way not to have to do moveaxis(0, 2) for
                 # cylindrical detectors (probably inside ASTRA)
                 if getattr(self.geometry, 'det_curvature_radius', None) is None:
                     out[:] = np.swapaxes(self.proj_array, 0, 1).reshape(
                         self.proj_space.shape)
                 else:
-                    out[:] = np.rollaxis(self.proj_array, 0, 3).reshape(
+                    out[:] = np.moveaxis(self.proj_array, 0, 2).reshape(
                         self.proj_space.shape)
 
             # Fix scaling to weight by pixel size
@@ -292,7 +292,7 @@ class AstraCudaImpl:
             elif self.geometry.ndim == 3:
                 shape = (-1,) + self.geometry.det_partition.shape
                 reshaped_proj_data = proj_data.asarray().reshape(shape)
-                # TODO: Find a way not to have to do rollaxis(2, 0) for
+                # TODO: Find a way not to have to do moveaxis(2, 0) for
                 # cylindrical detectors (probably inside ASTRA)
                 if getattr(self.geometry, 'det_curvature_radius', None) is None:
                     swapped_proj_data = np.ascontiguousarray(
@@ -300,7 +300,7 @@ class AstraCudaImpl:
                     )
                 else:
                     swapped_proj_data = np.ascontiguousarray(
-                        np.rollaxis(reshaped_proj_data, 2, 0)
+                        np.moveaxis(reshaped_proj_data, 2, 0)
                     )
                 astra.data3d.store(self.sino_id, swapped_proj_data)
 
