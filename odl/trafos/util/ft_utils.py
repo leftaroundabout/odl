@@ -342,7 +342,7 @@ def dft_preprocess_data(arr, shift=True, axes=None, sign='-', out=None):
             factor = np.arange(length, dtype=out.dtype)
             factor *= -imag * np.pi * (1 - 1.0 / length)
             np.exp(factor, out=factor)
-        return factor.astype(out.dtype, copy=False)
+        return factor.astype(out.dtype, copy=None)
 
     onedim_arrs = []
     for axis, shift in zip(axes, shift_list):
@@ -540,7 +540,7 @@ def dft_postprocess_data(arr, real_grid, recip_grid, shift, axes,
         else:
             onedim_arr /= interp_kernel
 
-        onedim_arrs.append(onedim_arr.astype(out.dtype, copy=False))
+        onedim_arrs.append(onedim_arr.astype(out.dtype, copy=None))
 
     fast_1d_tensor_mult(out, onedim_arrs, axes=axes, out=out)
     return out

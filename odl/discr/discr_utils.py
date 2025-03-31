@@ -826,7 +826,7 @@ class _PerAxisInterpolator(_Interpolator):
                 else:
                     weight = weight * w_hi
             out += np.asarray(self.values[edge]) * weight[vslice]
-        return np.array(out, copy=False, ndmin=1)
+        return np.array(out, copy=None, ndmin=1)
 
 
 class _LinearInterpolator(_PerAxisInterpolator):
@@ -1021,7 +1021,7 @@ def sampling_function(func_or_arr, domain, out_dtype=None):
         """Default in-place variant of an out-of-place-only function."""
         result = func_oop(x, **kwargs)
         try:
-            result = np.array(result, copy=False)
+            result = np.array(result, copy=None)
         except ValueError:
             # Different shapes encountered, need to broadcast
             if is_valid_input_array(x, domain.ndim):

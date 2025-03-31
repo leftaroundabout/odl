@@ -365,7 +365,7 @@ def noise_array(space):
         else:
             raise ValueError('bad dtype {}'.format(space.dtype))
 
-        return arr.astype(space.dtype, copy=False)
+        return arr.astype(space.dtype, copy=None)
 
 
 def noise_element(space):

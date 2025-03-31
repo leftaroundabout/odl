@@ -543,7 +543,7 @@ def astra_projection_geometry(geometry):
     return proj_geom
 
 
-def astra_data(astra_geom, datatype, data=None, ndim=2, allow_copy=False):
+def astra_data(astra_geom, datatype, data=None, ndim=2, allow_copy=None):
     """Create an ASTRA data object.
 
     Parameters

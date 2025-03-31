@@ -663,7 +663,7 @@ class Tensor(LinearSpaceElement):
         if dtype is None:
             return self.asarray()
         else:
-            return self.asarray().astype(dtype, copy=False)
+            return self.asarray().astype(dtype, copy=None)
 
     def __array_wrap__(self, array):
         """Return a new tensor wrapping the ``array``.

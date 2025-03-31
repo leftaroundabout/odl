@@ -796,7 +796,7 @@ class MatrixOperator(Operator):
         if scipy.sparse.isspmatrix(matrix):
             self.__matrix = matrix
         else:
-            self.__matrix = np.array(matrix, copy=False, ndmin=2)
+            self.__matrix = np.array(matrix, copy=None, ndmin=2)
 
         self.__axis, axis_in = int(axis), axis
         if self.axis != axis_in:
@@ -984,14 +984,14 @@ def _normalize_sampling_points(sampling_points, ndim):
     """
     sampling_points_in = sampling_points
     if ndim == 0:
-        sampling_points = [np.array(sampling_points, dtype=int, copy=False)]
+        sampling_points = [np.array(sampling_points, dtype=int, copy=None)]
         if sampling_points[0].size != 0:
             raise ValueError('`sampling_points` must be empty for '
                              '0-dim. `domain`')
     elif ndim == 1:
         if isinstance(sampling_points, Integral):
             sampling_points = (sampling_points,)
-        sampling_points = np.array(sampling_points, dtype=int, copy=False,
+        sampling_points = np.array(sampling_points, dtype=int, copy=None,
                                    ndmin=1)
 
         # Handle possible list of length one
@@ -1014,7 +1014,7 @@ def _normalize_sampling_points(sampling_points, ndim):
                                    for p in sampling_points]
             else:
                 sampling_points = [
-                    np.array(pts, dtype=int, copy=False, ndmin=1)
+                    np.array(pts, dtype=int, copy=None, ndmin=1)
                     for pts in sampling_points]
                 if any(pts.ndim != 1 for pts in sampling_points):
                     raise ValueError(

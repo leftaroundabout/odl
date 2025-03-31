@@ -36,7 +36,7 @@ def flying_focal_spot(angle, apart, shifts):
     """
     assert apart.ndim == 1
 
-    angle = np.array(angle, dtype=float, copy=False, ndmin=1)
+    angle = np.array(angle, dtype=float, copy=None, ndmin=1)
     assert angle.ndim == 1
 
     shifts = np.array(shifts, dtype=float, ndmin=2)

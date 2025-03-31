@@ -74,7 +74,7 @@ def vector(array, dtype=None, order=None, impl='numpy'):
     )
     """
     # Sanitize input
-    arr = np.array(array, copy=False, order=order, ndmin=1)
+    arr = np.array(array, copy=None, order=order, ndmin=1)
     if arr.dtype is object:
         raise ValueError('invalid input data resulting in `dtype==object`')
 
