@@ -13,10 +13,12 @@ from __future__ import division
 import operator
 import sys
 
+import torch 
 import numpy as np
 import pytest
 
 import odl
+from odl.space.base_tensors import TensorSpace
 from odl.set.space import LinearSpaceTypeError
 from odl.space.npy_tensors import (
     NumpyTensor, NumpyTensorSpace, NumpyTensorSpaceArrayWeighting,
@@ -36,15 +38,19 @@ PYTHON2 = sys.version_info.major < 3
 # when a new impl is available.
 
 
-def _pos_array(space):
+def _pos_array(space:TensorSpace):
     """Create an array with positive real entries in ``space``."""
-    return np.abs(noise_array(space)) + 0.1
-
+    nar = noise_array(space)
+    if space.impl == 'pytorch':
+        nar = torch.from_numpy(nar)
+    return space.array_namespace.abs(nar) + 0.1
 
 def _array_cls(impl):
     """Return the array class for given impl."""
     if impl == 'numpy':
         return np.ndarray
+    elif impl == 'pytorch':
+        return torch.Tensor
     else:
         assert False
 

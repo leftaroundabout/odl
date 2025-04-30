@@ -6,7 +6,7 @@ Including some benchmarks with an optimized version.
 import numpy as np
 import odl
 from odl.space.base_tensors import TensorSpace, Tensor
-from odl.util.testutils import timer
+from odl.util.testutils import timer, AVOID_UNNECESSARY_COPY
 
 
 class SimpleRn(TensorSpace):
