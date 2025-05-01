@@ -79,7 +79,7 @@ class NumpyTensorSpace(TensorSpace):
     .. _Wikipedia article on tensors: https://en.wikipedia.org/wiki/Tensor
     """
 
-    def __init__(self, shape, dtype=None, **kwargs):
+    def __init__(self, shape, dtype=None, device = 'cpu', **kwargs):
         r"""Initialize a new instance.
 
         Parameters
@@ -92,6 +92,8 @@ class NumpyTensorSpace(TensorSpace):
             way the `numpy.dtype` function understands, e.g.
             as built-in type or as a string. For ``None``,
             the `default_dtype` of this space (``float64``) is used.
+        device : 
+            Device on which the data is. It must be 'cpu'.
         exponent : positive float, optional
             Exponent of the norm. For values other than 2.0, no
             inner product is defined.
@@ -228,6 +230,8 @@ class NumpyTensorSpace(TensorSpace):
             raise ValueError('`dtype` {!r} not supported'
                              ''.format(dtype_str(dtype)))
 
+        ### Unpacking the device argument
+        assert device == 'cpu', f"Only 'cpu' is supported for numpy tensor space, got {device}"
         dist = kwargs.pop('dist', None)
         norm = kwargs.pop('norm', None)
         inner = kwargs.pop('inner', None)
@@ -328,6 +332,11 @@ class NumpyTensorSpace(TensorSpace):
                     in_place = NumOperationParadigmSupport.NOT_SUPPORTED,
                     out_of_place = NumOperationParadigmSupport.PREFERRED)
     
+    @property
+    def device(self):
+        """Device identifier."""
+        return 'cpu'
+
     @property
     def default_order(self):
         """Default storage order for new elements in this space: ``'C'``."""

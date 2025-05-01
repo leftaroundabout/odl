@@ -63,7 +63,7 @@ class TensorSpace(LinearSpace):
     .. _Wikipedia article on tensors: https://en.wikipedia.org/wiki/Tensor
     """
 
-    def __init__(self, shape, dtype):
+    def __init__(self, shape, dtype, device):
         """Initialize a new instance.
 
         Parameters
@@ -77,6 +77,10 @@ class TensorSpace(LinearSpace):
             as built-in type or as a string.
             For a data type with a ``dtype.shape``, these extra dimensions
             are added *to the left* of ``shape``.
+        device : 
+            Device on which the data should be stored. Please see:
+            https://data-apis.org/array-api/latest/design_topics/device_support.html#device-support
+            for the guidelines on declaring your device
         """
         # Handle shape and dtype, taking care also of dtypes with shape
         try:
@@ -159,6 +163,11 @@ class TensorSpace(LinearSpace):
     def dtype(self):
         """Scalar data type of each entry in an element of this space."""
         return self.__dtype
+    
+    @property
+    def device(self):
+        """Device identifier."""
+        raise NotImplementedError('Device attribute not implemented')
 
     @property
     def is_real(self):
