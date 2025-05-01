@@ -225,6 +225,11 @@ class TensorSpace(LinearSpace):
             raise ValueError(
                 '`complex_space` not defined for non-numeric `dtype`')
         return self.astype(self.complex_dtype)
+    
+    def as_compatible_array(self, array):
+        """Conversion of one array to the type of the tensor space
+        """
+        return self.array_namespace.from_dlpack(array)
 
     def _astype(self, dtype):
         """Internal helper for `astype`.
