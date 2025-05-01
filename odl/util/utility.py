@@ -17,9 +17,11 @@ from contextlib import contextmanager
 from itertools import product
 
 import numpy as np
+import array_api_compat.numpy as npy_compat
 
 __all__ = (
     'REPR_PRECISION',
+    'ARRAY_NAMESPACES',
     'indent',
     'dedent',
     'npy_printoptions',
@@ -68,6 +70,11 @@ TYPE_MAP_R2C = {np.dtype(dtype): np.result_type(dtype, 1j)
 TYPE_MAP_C2R = {cdt: np.empty(0, dtype=cdt).real.dtype
                 for rdt, cdt in TYPE_MAP_R2C.items()}
 TYPE_MAP_C2R.update({k: k for k in TYPE_MAP_R2C.keys()})
+
+ARRAY_NAMESPACES = {
+    'numpy': npy_compat
+}
+
 
 
 def indent(string, indent_str='    '):
