@@ -10,6 +10,7 @@
 
 from __future__ import absolute_import, division, print_function
 
+from types import ModuleType
 from numbers import Integral
 
 import numpy as np
@@ -110,6 +111,26 @@ class TensorSpace(LinearSpace):
             field = None
 
         LinearSpace.__init__(self, field)
+
+    @property
+    def array_namespace(self) -> ModuleType:
+        """Name of the array_namespace of this tensor set.
+        This relates to the python array api
+
+        This property should be overridden by subclasses.
+
+        """
+        raise NotImplementedError('abstract method')
+    
+    @property
+    def array_type(self):
+        """Name of the array_type of this tensor set.
+        This relates to the python array api
+
+        This property should be overridden by subclasses.
+
+        """
+        raise NotImplementedError('abstract method')
 
     @property
     def impl(self):

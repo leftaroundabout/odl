@@ -30,6 +30,8 @@ from odl.util import (
     dtype_str, is_floating_dtype, is_numeric_dtype, is_real_dtype, nullcontext,
     signature_string, writable_array)
 
+import array_api_compat.numpy as xp
+
 __all__ = ('NumpyTensorSpace',)
 
 
@@ -293,6 +295,18 @@ class NumpyTensorSpace(TensorSpace):
         # Make sure there are no leftover kwargs
         if kwargs:
             raise TypeError('got unknown keyword arguments {}'.format(kwargs))
+
+    @property
+    def array_namespace(self):
+        """Name of the array_namespace"""
+        return xp
+    
+    @property
+    def array_type(self):
+        """Name of the array_type of this tensor set.
+        This relates to the python array api
+        """
+        return np.ndarray
 
     @property
     def impl(self):
