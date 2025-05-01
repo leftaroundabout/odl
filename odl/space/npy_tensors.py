@@ -349,6 +349,14 @@ class NumpyTensorSpace(TensorSpace):
     def exponent(self):
         """Exponent of the norm and the distance."""
         return self.weighting.exponent
+    
+    def as_compatible_array(self, array):
+        """Conversion of one array to the type of the tensor space
+        """
+        if isinstance(array, np.ndarray):
+            return array
+        
+        return np.array(xp.from_dlpack(array), copy=True)
 
     def element(self, inp=None, data_ptr=None, order=None):
         """Create a new element.
