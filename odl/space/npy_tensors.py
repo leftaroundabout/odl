@@ -225,7 +225,7 @@ class NumpyTensorSpace(TensorSpace):
         >>> space
         tensor_space((2, 3), dtype=int)
         """
-        super(NumpyTensorSpace, self).__init__(shape, dtype)
+        super(NumpyTensorSpace, self).__init__(shape, dtype, device)
         if self.dtype.char not in self.available_dtypes():
             raise ValueError('`dtype` {!r} not supported'
                              ''.format(dtype_str(dtype)))
