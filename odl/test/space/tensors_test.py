@@ -1394,6 +1394,16 @@ def test_custom_dist(tspace):
     with pytest.raises(TypeError):
         _weighting_cls(impl, 'dist')(1)
 
+def test_reductions(tspace):
+    """Test reductions without using ufuncs """
+    space = odl.rn(4, impl = tspace.impl)
+    element = space.element([1,2,3,4])
+
+    assert element.reduction('min') == 1
+    assert element.reduction('max') == 4
+    assert element.reduction('sum') == 10
+    assert element.reduction('prod') == 24
+
 
 if __name__ == '__main__':
     odl.util.test_file(__file__)
