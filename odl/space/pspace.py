@@ -22,7 +22,6 @@ from odl.space.weighting import (
     ArrayWeighting, ConstWeighting, CustomDist, CustomInner, CustomNorm,
     Weighting)
 from odl.util import indent, is_real_dtype, signature_string
-from odl.util.ufuncs import ProductSpaceUfuncs
 
 __all__ = ('ProductSpace',)
 
@@ -1160,63 +1159,35 @@ class ProductSpaceElement(LinearSpaceElement):
 
         return self.space.element(array)
 
-    @property
-    def ufuncs(self):
-        """`ProductSpaceUfuncs`, access to Numpy style ufuncs.
+    def reduction(self, operation:str):
+        """Return the result of a reduction operation on the Tensor.
 
-        These are always available if the underlying spaces are
-        `TensorSpace`.
+        Parameters
+        ----------
+        operation :
+            String keyword for the reduction operation. Can be
+                - min
+                - max
+                - sum
+                - prod
 
-        Examples
-        --------
-        >>> r22 = odl.ProductSpace(odl.rn(2), 2)
-        >>> x = r22.element([[1, -2], [-3, 4]])
-        >>> x.ufuncs.absolute()
-        ProductSpace(rn(2), 2).element([
-            [ 1.,  2.],
-            [ 3.,  4.]
-        ])
+        Returns
+        -------
+            scalar value of the reduction operation
 
-        These functions can also be used with non-vector arguments and
-        support broadcasting, per component and even recursively:
-
-        >>> x.ufuncs.add([1, 2])
-        ProductSpace(rn(2), 2).element([
-            [ 2.,  0.],
-            [-2.,  6.]
-        ])
-        >>> x.ufuncs.subtract(1)
-        ProductSpace(rn(2), 2).element([
-            [ 0., -3.],
-            [-4.,  3.]
-        ])
-
-        There is also support for various reductions (sum, prod, min, max):
-
-        >>> x.ufuncs.sum()
-        0.0
-
-        Writing to ``out`` is also supported:
-
-        >>> y = r22.element()
-        >>> result = x.ufuncs.absolute(out=y)
-        >>> result
-        ProductSpace(rn(2), 2).element([
-            [ 1.,  2.],
-            [ 3.,  4.]
-        ])
-        >>> result is y
-        True
-
-        See Also
-        --------
-        odl.util.ufuncs.TensorSpaceUfuncs
-            Base class for ufuncs in `TensorSpace` spaces, subspaces may
-            override this for greater efficiency.
-        odl.util.ufuncs.ProductSpaceUfuncs
-            For a list of available ufuncs.
+        Note
+        ----
+            The reduction on the individual spaces is performed with the backend associated
+            with each space, but the reduction on the product space is left to NumPy
         """
-        return ProductSpaceUfuncs(self)
+        assert operation in ['min', 'max', 'sum', 'prod'], f' \
+        The provided operation {operation} is not supported. It can only be "min", \
+        "max", "sum", "prod"'        
+
+        function = getattr(np, operation)
+
+        return function([x.reduction(operation) for x in self.__parts])
+
 
     @property
     def real(self):
