@@ -544,7 +544,7 @@ class Tensor(LinearSpaceElement):
 
     """Abstract class for representation of `TensorSpace` elements."""
 
-    def asarray(self, out=None, display=False):
+    def asarray(self, out=None):
         """Extract the data of this tensor as a Numpy array.
 
         This method should be overridden by subclasses.
@@ -553,10 +553,6 @@ class Tensor(LinearSpaceElement):
         ----------
         out : `numpy.ndarray`, optional
             Array to write the result to.
-        display : `bool`, default is False
-            keyword to indicate if the extraction is for display.
-            It is relevant for tensors on the GPU that must be copied
-            to the CPU.
 
         Returns
         -------
@@ -859,7 +855,10 @@ class Tensor(LinearSpaceElement):
         full_grid = uniform_grid([0] * self.ndim, np.array(self.shape) - 1,
                                  self.shape)
         grid = full_grid[indices].squeeze()
-        values = self.asarray(display=True)[indices].squeeze()
+        data = self.asarray()
+        if not isinstance(data, np.ndarray):
+            data = data.to_device('cpu')
+        values = data[indices].squeeze()
 
         return show_discrete_data(values, grid, title=title, method=method,
                                   force_show=force_show, fig=fig, **kwargs)

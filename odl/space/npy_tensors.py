@@ -933,7 +933,7 @@ class NumpyTensor(Tensor):
         else:
             self.__data[:] = other.__data
 
-    def asarray(self, out=None, display = False):
+    def asarray(self, out=None):
         """Extract the data of this array as a ``numpy.ndarray``.
 
         This method is invoked when calling `numpy.asarray` on this
@@ -976,8 +976,6 @@ class NumpyTensor(Tensor):
         if out is None:
             return self.data
         else:
-            assert display == False, 'No out argument should be provided when '\
-                                     'the method is called to display'
             out[:] = self.data
             return out
 
