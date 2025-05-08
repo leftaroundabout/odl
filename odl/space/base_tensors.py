@@ -608,6 +608,20 @@ class Tensor(LinearSpaceElement):
         raise NotImplementedError('abstract method')
 
     @property
+    def array_namespace(self) -> ModuleType:
+        """Name of the array_namespace of this tensor.
+        This relates to the python array api
+        """
+        return self.space.array_namespace
+    
+    @property
+    def array_type(self):
+        """Name of the array_type of this tensor set.
+        This relates to the python array api
+        """
+        return self.space.array_type
+
+    @property
     def impl(self):
         """Name of the implementation back-end of this tensor."""
         return self.space.impl
@@ -723,6 +737,31 @@ class Tensor(LinearSpaceElement):
             return self.space.field.element(array)
         else:
             return self.space.element(array)
+        
+    def reduction(self, operation:str):
+        """Return the result of a reduction operation on the Tensor.
+
+        Parameters
+        ----------
+        operation :
+            String keyword for the reduction operation. Can be
+                - min
+                - max
+                - sum
+                - prod
+
+        Returns
+        -------
+            scalar value of the reduction operation
+        """
+        assert operation in ['min', 'max', 'sum', 'prod'], f' \
+        The provided operation {operation} is not supported. It can only be "min", \
+        "max", "sum", "prod"'        
+
+        function = getattr(self.array_namespace, operation)
+
+        return function(self.asarray())
+        
 
     def show(self, title=None, method='', indices=None, force_show=False,
              fig=None, **kwargs):
