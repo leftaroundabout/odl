@@ -23,7 +23,7 @@ from odl.util import (
     array_str, dtype_str, indent, is_complex_floating_dtype, is_floating_dtype,
     is_numeric_dtype, is_real_dtype, is_real_floating_dtype, safe_int_conv,
     signature_string, writable_array)
-from odl.util.ufuncs import TensorSpaceUfuncs
+
 from odl.util.utility import TYPE_MAP_C2R, TYPE_MAP_R2C, nullcontext
 
 __all__ = ('TensorSpace',)
@@ -544,7 +544,7 @@ class Tensor(LinearSpaceElement):
 
     """Abstract class for representation of `TensorSpace` elements."""
 
-    def asarray(self, out=None):
+    def asarray(self, out=None, display=False):
         """Extract the data of this tensor as a Numpy array.
 
         This method should be overridden by subclasses.
@@ -553,6 +553,10 @@ class Tensor(LinearSpaceElement):
         ----------
         out : `numpy.ndarray`, optional
             Array to write the result to.
+        display : `bool`, default is False
+            keyword to indicate if the extraction is for display.
+            It is relevant for tensors on the GPU that must be copied
+            to the CPU.
 
         Returns
         -------
@@ -720,20 +724,6 @@ class Tensor(LinearSpaceElement):
         else:
             return self.space.element(array)
 
-    @property
-    def ufuncs(self):
-        """Access to Numpy style universal functions.
-
-        These default ufuncs are always available, but may or may not be
-        optimized for the specific space in use.
-
-        .. note::
-            This interface is will be deprecated when Numpy 1.13 becomes
-            the minimum required version. Use Numpy ufuncs directly, e.g.,
-            ``np.sqrt(x)`` instead of ``x.ufuncs.sqrt()``.
-        """
-        return TensorSpaceUfuncs(self)
-
     def show(self, title=None, method='', indices=None, force_show=False,
              fig=None, **kwargs):
         """Display the function graphically.
@@ -830,7 +820,7 @@ class Tensor(LinearSpaceElement):
         full_grid = uniform_grid([0] * self.ndim, np.array(self.shape) - 1,
                                  self.shape)
         grid = full_grid[indices].squeeze()
-        values = self.asarray()[indices].squeeze()
+        values = self.asarray(display=True)[indices].squeeze()
 
         return show_discrete_data(values, grid, title=title, method=method,
                                   force_show=force_show, fig=fig, **kwargs)
