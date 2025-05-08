@@ -916,49 +916,13 @@ def test_operators(odl_arithmetic_op):
     assert all_almost_equal([x, y, z], [x_arr, y_arr, z_arr])
 
 
-def test_ufuncs():
-    # Cannot use fixture due to bug in pytest
-    H = odl.ProductSpace(odl.rn(1), odl.rn(2))
-
-    # one arg
-    x = H.element([[-1], [-2, -3]])
-
-    z = x.ufuncs.absolute()
-    assert all_almost_equal(z, [[1], [2, 3]])
-
-    # one arg with out
-    x = H.element([[-1], [-2, -3]])
-    y = H.element()
-
-    z = x.ufuncs.absolute(out=y)
-    assert y is z
-    assert all_almost_equal(z, [[1], [2, 3]])
-
-    # Two args
-    x = H.element([[1], [2, 3]])
-    y = H.element([[4], [5, 6]])
-    w = H.element()
-
-    z = x.ufuncs.add(y)
-    assert all_almost_equal(z, [[5], [7, 9]])
-
-    # Two args with out
-    x = H.element([[1], [2, 3]])
-    y = H.element([[4], [5, 6]])
-    w = H.element()
-
-    z = x.ufuncs.add(y, out=w)
-    assert w is z
-    assert all_almost_equal(z, [[5], [7, 9]])
-
-
 def test_reductions():
     H = odl.ProductSpace(odl.rn(1), odl.rn(2))
     x = H.element([[1], [2, 3]])
-    assert x.ufuncs.sum() == 6.0
-    assert x.ufuncs.prod() == 6.0
-    assert x.ufuncs.min() == 1.0
-    assert x.ufuncs.max() == 3.0
+    assert x.reduction('sum') == 6.0
+    assert x.reduction('prod') == 6.0
+    assert x.reduction('min') == 1.0
+    assert x.reduction('max') == 3.0
 
 
 def test_np_reductions():
