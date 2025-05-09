@@ -78,7 +78,7 @@ class DiscretizedSpace(TensorSpace):
         self.__tspace = tspace
         self.__partition = partition
 
-        super(DiscretizedSpace, self).__init__(tspace.shape, tspace.dtype)
+        super(DiscretizedSpace, self).__init__(tspace.shape, tspace.dtype, tspace.device)
 
         # Set axis labels
         axis_labels = kwargs.pop('axis_labels', None)
@@ -96,6 +96,10 @@ class DiscretizedSpace(TensorSpace):
                              ''.format(kwargs))
 
     # --- Meta-info
+    @property
+    def array_namespace(self):
+        """Array namespace of the discretized space, which is based on the underlying tensorspace"""
+        return self.__tspace.array_namespace
 
     @property
     def element_type(self):
@@ -1625,15 +1629,12 @@ def uniform_discr_frompartition(partition, dtype=None, impl='numpy', **kwargs):
         else:
             weighting = partition.cell_volume
 
-    tensor_impl_args = {}
-
-    if impl=='pytorch':
-        for arg in ['torch_device']:
-            if arg in kwargs:
-                tensor_impl_args[arg] = kwargs.pop(arg)
-
+    tspace_kwarg = {}
+    if 'device' in kwargs:
+        tspace_kwarg['device'] = kwargs.pop('device')
     tspace = tspace_type(partition.shape, dtype, exponent=exponent,
-                         weighting=weighting, **tensor_impl_args)
+                         weighting=weighting, **tspace_kwarg)
+
     return DiscretizedSpace(partition, tspace, **kwargs)
 
 

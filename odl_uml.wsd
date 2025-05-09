@@ -1,0 +1,923 @@
+@startuml ODL
+
+' B ..|> A = B implements A
+' B --|> A = B extends A
+package ODL <<Folder>>{
+    left to right direction
+    
+    package set <<Folder>>{
+        
+        package sets <<Rectangle>>{
+            abstract class Set
+            class EmptySet 
+            class UniversalSet
+            class Strings
+            class Field
+            class ComplexNumbers
+            class RealNumbers
+            class Integers
+            class CartesianProduct
+            class SetUnion
+            class SetIntersection
+            class FiniteSet
+
+            EmptySet ..|> Set
+            UniversalSet ..|> Set
+            Strings ..|> Set
+            Field --|> Set
+            ComplexNumbers ..|> Field
+            RealNumbers ..|> Field 
+            Integers ..|> Set 
+            CartesianProduct ..|> Set 
+            SetUnion ..|> Set 
+            SetIntersection ..|> Set 
+            FiniteSet ..|> Set 
+        }
+        package domain <<Rectangle>>{
+            class IntervalProd 
+
+            IntervalProd ..|> Set
+        }
+        package space <<Rectangle>>{
+            abstract class LinearSpace 
+            abstract class LinearSpaceElement
+            class UniversalSpace
+
+            LinearSpace --|> Set
+            UniversalSpace ..|> LinearSpace
+        }
+    }
+
+    package space <<Folder>>{
+        left to right direction
+        package base_tensors <<Rectangle>>{
+            abstract class TensorSpace
+            abstract class Tensor 
+
+            TensorSpace --|> LinearSpace
+            Tensor --|> LinearSpaceElement
+        }
+        package weighting <<Rectangle>>{
+            abstract class Weighting
+            class MatrixWeighting
+            class ArrayWeighting
+            class ConstWeighting
+            class CustomInner
+            class CustomNorm
+            class CustomDist
+
+            MatrixWeighting --|> Weighting
+            ArrayWeighting --|> Weighting
+            ConstWeighting --|> Weighting
+            CustomInner --|> Weighting
+            CustomNorm --|> Weighting
+            CustomDist --|> Weighting
+
+        }
+        
+        package npy_tensors <<Rectangle>>{
+            class NumpyTensorSpace
+            class NumpyTensor
+            class NumpyTensorMatrixWeighting
+            class NumpyTensorArrayWeighting
+            class NumpyTensorConstWeighting
+            class NumpyTensorCustomInner
+            class NumpyTensorCustomNorm
+            class NumpyTensorCustomDist
+
+            NumpyTensorSpace ..|> TensorSpace
+            NumpyTensor ..|> Tensor
+            NumpyTensorMatrixWeighting ..|> MatrixWeighting
+            NumpyTensorArrayWeighting ..|> ArrayWeighting
+            NumpyTensorConstWeighting ..|> ConstWeighting
+            NumpyTensorCustomInner ..|> CustomInner
+            NumpyTensorCustomNorm ..|> CustomNorm
+            NumpyTensorCustomDist ..|> CustomDist
+        }
+
+        package pspace <<Rectangle>>{
+            class ProductSpace
+            class ProductSpaceElement
+            class ProductSpaceArrayWeighting
+            class ProductSpaceConstWeighting
+            class ProductSpaceCustomInner
+            class ProductSpaceCustomNorm
+            class ProductSpaceCustomDist
+
+            ProductSpace ..|> LinearSpace
+            ProductSpaceElement ..|> LinearSpaceElement
+            ProductSpaceArrayWeighting ..|> ArrayWeighting
+            ProductSpaceConstWeighting ..|> ConstWeighting
+            ProductSpaceCustomInner ..|> CustomInner
+            ProductSpaceCustomNorm ..|> CustomNorm
+            ProductSpaceCustomDist ..|> CustomDist
+        }
+
+        package entry_points <<Rectangle>>{
+        }
+        
+        package space_utils <<Rectangle>>{
+
+        }
+        
+    }
+    package operator <<Folder>>{
+        package operator <<Rectangle>>{
+            abstract class Operator
+            class OperatorSum
+            class OperatorVectorSum
+            class OperatorComp
+            class OperatorPointwiseProduct
+            class OperatorLeftScalarMult
+            class OperatorRightScalarMult
+            class OperatorLeftVectorMult
+            class OperatorRightVectorMult
+
+            OperatorSum --|> Operator 
+            OperatorVectorSum --|> Operator 
+            OperatorComp --|> Operator 
+            OperatorPointwiseProduct --|> Operator 
+            OperatorLeftScalarMult --|> Operator 
+            OperatorRightScalarMult --|> Operator 
+            OperatorLeftVectorMult --|> Operator 
+            OperatorRightVectorMult --|> Operator 
+
+        }
+        package default_ops <<Rectangle>>{
+            class ScalingOperator
+            class IdentityOperator
+            class LinCombOperator
+            class MultiplyOperator
+            class PowerOperator
+            class InnerProductOperator
+            class NormOperator
+            class DistOperator
+            class ZeroOperator
+            class ConstantOperator
+            class RealPart
+            class ImagPart
+            class ComplexEmbedding
+            class ComplexModulus 
+            class ComplexModulusDerivative
+            class ComplexModulusDerivativeAdjoint
+            class ComplexModulusSquared
+            class ComplexModulusSquaredDerivative
+            class ComplexModulusSquaredDerivativeAdjoint
+
+            'Scaling Operator
+            ScalingOperator --|> Operator
+            'Identity Operator
+            IdentityOperator ..|> ScalingOperator
+            'Linear Combination Operator
+            LinCombOperator ..|> Operator
+            LinCombOperator ..> ProductSpace
+            'Multiply Operator
+            MultiplyOperator ..|> Operator
+            MultiplyOperator ..> InnerProductOperator
+            MultiplyOperator ..> MultiplyOperator
+            'Power Operator
+            PowerOperator ..|> Operator
+            PowerOperator ..> MultiplyOperator
+            'Inner Product Operator
+            InnerProductOperator ..|> Operator
+            InnerProductOperator ..> MultiplyOperator
+            'Norm Operator
+            NormOperator ..|> Operator
+            NormOperator ..> InnerProductOperator
+            'Distance Operator
+            DistOperator ..|> Operator
+            DistOperator ..> InnerProductOperator
+            'Zero Operator
+            ZeroOperator ..|> Operator
+            'Constant Operator
+            ConstantOperator ..|> Operator
+            ConstantOperator ..> ZeroOperator
+            'Real Part Operator
+            RealPart ..|> Operator
+            RealPart ..> ComplexEmbedding
+            'Imaginary Part Operator
+            ImagPart ..|> Operator
+            ImagPart ..> ComplexEmbedding
+            ImagPart ..> ZeroOperator
+            'Complex Embedding Operator
+            ComplexEmbedding ..|> Operator
+            ComplexEmbedding ..> RealPart
+            ComplexEmbedding ..> ImagPart
+            'Complex Modulus Operator
+            ComplexModulus ..|> Operator
+            ComplexModulus ..> ComplexModulusDerivative
+            'Complex Modulus Derivative Operator
+            ComplexModulusDerivative ..|> Operator
+            ComplexModulusDerivative ..> ComplexModulusDerivativeAdjoint
+            'Complex Modulus Derivative Adjoint Operator
+            ComplexModulusDerivativeAdjoint ..|> Operator
+            'Complex Modulus Squared Operator
+            ComplexModulusSquared ..|> Operator 
+            ComplexModulusSquared ..> ComplexModulusSquaredDerivative
+            'Complex Modulus Squared Derivative Operator   
+            ComplexModulusSquaredDerivative ..|> Operator
+            ComplexModulusSquaredDerivative ..> ComplexModulusSquaredDerivativeAdjoint
+            'Complex Modulus Squared Derivative Adjoint Operator
+            ComplexModulusSquaredDerivativeAdjoint ..|> Operator
+        }   
+        
+        package oputils <<Rectangle>>{
+
+        }
+        package pspace_ops <<Rectangle>>{
+            class ProductSpaceOperator
+            class ComponentProjection
+            class ComponentProjectionAdjoint
+            class BroadcastOperator
+            class ReductionOperator
+            class DiagonalOperator
+
+            'Product Space Operator
+            ProductSpaceOperator --|> Operator
+            ProductSpaceOperator ..> ProductSpace
+            'Component Projection
+            ComponentProjection ..|> Operator
+            ComponentProjection ..> ComponentProjectionAdjoint
+            'Component Projection Adjoint
+            ComponentProjectionAdjoint ..|> Operator
+            ComponentProjectionAdjoint ..> ComponentProjection
+            'Broadcast Operator
+            BroadcastOperator ..|> Operator
+            BroadcastOperator ..> ProductSpaceOperator
+            BroadcastOperator ..> ReductionOperator
+            'Reduction Operator
+            ReductionOperator ..|> Operator
+            ReductionOperator ..> ProductSpaceOperator
+            ReductionOperator ..> BroadcastOperator
+            'Diagonal Operator
+            DiagonalOperator ..|> ProductSpaceOperator
+        
+        }
+        package tensor_ops <<Rectangle>>{
+            abstract class PointwiseTensorFieldOperator
+            class PointwiseNorm
+            class PointwiseInnerBase
+            class PointwiseInner
+            class PointwiseInnerAdjoint
+            class PointwiseSum
+            class MatrixOperator
+            class SamplingOperator
+            class WeightedSumSamplingOperator
+            class FlatteningOperator
+            class FlatteningOperatorInverse
+
+            'Pointwise norm
+            PointwiseNorm ..|> PointwiseTensorFieldOperator
+            PointwiseNorm ..> PointwiseInner
+            'Base Class for PointWiseInner classes
+            PointwiseInnerBase --|> PointwiseTensorFieldOperator
+            'Inner Product
+            PointwiseInner ..|> PointwiseInnerBase
+            PointwiseInner ..> PointwiseInnerAdjoint
+            
+            'Adjoint of the inner product
+            PointwiseInnerAdjoint ..|> PointwiseInnerBase 
+            PointwiseInnerAdjoint ..> PointwiseInner
+            'Pointwise Sum
+            PointwiseSum ..|> PointwiseInner
+            'Matrix Operator 
+            MatrixOperator ..|> Operator 
+            'Sampling Operator
+            SamplingOperator ..|> Operator
+            SamplingOperator ..> WeightedSumSamplingOperator
+            'Weighted-Sum Sampling Operator
+            WeightedSumSamplingOperator ..|> Operator
+            WeightedSumSamplingOperator ..> SamplingOperator
+            'Flattening Operator
+            FlatteningOperator ..|> Operator
+            FlatteningOperator ..> FlatteningOperatorInverse
+        }
+    }
+    package discr <<Folder>>{
+        package diff_ops <<Rectangle>>{
+            class PartialDerivative
+            class Gradient
+            class Divergence
+            class Laplacian
+
+            'Partial Derivative
+            PartialDerivative ..|> PointwiseTensorFieldOperator
+            'Gradient 
+            Gradient ..|> PointwiseTensorFieldOperator
+            'Divergence
+            Divergence ..|> PointwiseTensorFieldOperator
+            'Laplacian
+            Laplacian ..|> PointwiseTensorFieldOperator
+
+        }
+        package discr_ops <<Rectangle>>{
+            class Resampling
+            class ResizingOperator
+            class ResizingOperatorAdjoint
+
+            'Resampling
+            Resampling ..|> Operator
+            'Resizing Operator
+            ResizingOperator ..|> Operator
+            ResizingOperator ..> ResizingOperatorAdjoint
+            'Resizing Operator Adjoint
+            ResizingOperatorAdjoint ..|> Operator
+            
+        }
+        package discr_space <<Rectangle>>{
+            class DiscretizedSpace
+            class DiscretizedSpaceSelement
+
+            DiscretizedSpace ..|> TensorSpace
+            DiscretizedSpaceSelement ..|> Tensor
+        }
+        package discr_utils <<Rectangle>>{
+            abstract class _Interpolator
+            class _NearestInterpolator
+            class _PerAxisInterpolator
+            class _LinearInterpolator
+
+            _PerAxisInterpolator --|> _Interpolator
+            _LinearInterpolator ..|> _PerAxisInterpolator
+            _NearestInterpolator ..|> _Interpolator
+        }
+        package grid <<Rectangle>>{
+            class RectGrid
+
+            RectGrid ..|> Set            
+        }
+        package partition <<Rectangle>>{
+            class RectPartition
+        }
+    }
+    package deform <<Folder>>{
+        package linearized <<Rectangle>>{
+            class LinDeformFixedTempl
+            class LinDeformFixedDisp
+
+            LinDeformFixedTempl ..|> Operator
+            LinDeformFixedTempl ..> Gradient
+            LinDeformFixedDisp ..|> Operator
+            LinDeformFixedDisp ..> Divergence
+
+        }
+    }
+    package solvers <<Folder>>{
+        package functional <<Frame>>{
+
+            package functional <<Rectangle>>{
+                abstract class Functional 
+                class FunctionalDefaultConvexConjugate
+                class FunctionalTranslation
+                class BregmanDistance
+                class FunctionalComp
+                class FunctionalLeftScalarMult
+                class FunctionalRightScalarMult
+                class FunctionalRightVectorMult    
+                class FunctionalSum
+                class FunctionalScalarSum            
+                class FunctionalCompositionGradient
+                class FunctionalQuadraticPerturb
+                class InfimalConvolution
+                class FunctionalProduct
+                class FunctionalProductGradient
+                class FunctionalQuotient
+                class FunctionalQuotientGradient
+
+                'Functional Operator 
+                Functional --|> Operator 
+                Functional ..> FunctionalDefaultConvexConjugate
+                Functional ..> FunctionalTranslation
+                Functional ..> BregmanDistance
+                Functional ..> FunctionalComp
+                Functional ..> ConstantFunctional
+                Functional ..> ZeroFunctional
+                Functional ..> FunctionalLeftScalarMult
+                Functional ..> FunctionalRightScalarMult
+                Functional ..> FunctionalRightVectorMult
+                Functional ..> ConstantFunctional
+                Functional ..> ZeroFunctional
+                Functional ..> FunctionalSum
+                Functional ..> FunctionalScalarSum
+                'Functional Default Convex Conjugate
+                FunctionalDefaultConvexConjugate ..|> Functional
+                'Functional Translation
+                FunctionalTranslation ..|> Functional
+                FunctionalTranslation ..> IdentityOperator
+                FunctionalTranslation ..> FunctionalQuadraticPerturb
+                'Bregman Distance
+                BregmanDistance ..|> Functional
+                BregmanDistance ..> FunctionalQuadraticPerturb
+                BregmanDistance ..> ConstantOperator
+                'Functional Comp 
+                FunctionalComp ..|> Functional
+                FunctionalComp ..|> OperatorComp
+                FunctionalComp ..> FunctionalCompositionGradient
+                'Functional Composition Gradient 
+                FunctionalCompositionGradient ..|> Operator
+                'Functional Left Scalar Multiplication
+                FunctionalLeftScalarMult ..|> Functional
+                FunctionalLeftScalarMult ..|> OperatorLeftScalarMult
+                'Functional Right Scalar Multiplication
+                FunctionalRightScalarMult ..|> Functional
+                FunctionalRightScalarMult ..|> OperatorRightScalarMult
+                'Functional Right Vector Multiplication
+                FunctionalRightVectorMult ..|> Functional
+                FunctionalRightVectorMult ..|> OperatorRightScalarMult
+                'Functional Sum
+                FunctionalSum ..|> Functional
+                FunctionalSum ..|> OperatorSum
+                'Functional Scalar Sum
+                FunctionalScalarSum --|> FunctionalSum
+                FunctionalScalarSum ..> ConstantFunctional
+                'Functional Quadratic Perturb
+                FunctionalQuadraticPerturb ..|> Functional
+                FunctionalQuadraticPerturb ..> IdentityOperator
+                FunctionalQuadraticPerturb ..> ConstantOperator
+                'Infimal Convolution
+                InfimalConvolution ..|> Functional
+                'Functional Product
+                FunctionalProduct ..|> Functional
+                FunctionalProduct ..|> OperatorPointwiseProduct
+                FunctionalProduct ..> FunctionalProductGradient
+                'FunctionalProductGradient
+                FunctionalProductGradient ..> Operator
+                'Functional Quotient
+                FunctionalQuotient ..|> Functional
+                FunctionalQuotient ..> FunctionalQuotientGradient
+                'FunctionalQuotientGradient
+                FunctionalQuotientGradient ..|> Operator
+            }
+
+            package default_functionals <<Rectangle>>{
+                class LpNorm
+                class IndicatorLpUnitBall
+                class L1Gradient
+                class L2Gradient
+                class GroupL1Norm
+                class GroupL1Gradient
+                class IndicatorGroupL1UnitBall
+                class IndicatorGroupLpUnitBall
+                class L1Norm
+                class L2Norm
+                class L2NormSquared
+                class ConstantFunctional
+                class ZeroFunctional
+                class IndicatorZero
+                class ScalingFunctional
+                class IdentityFunctional
+                class IndicatorBox
+                class IndicatorNonnegativity
+                class IndicatorZero
+                class KullbackLeibler
+                class KLGradient
+                class KullbackLeiblerConvexConj
+                class KLCCGradient
+                class KullbackLeiblerCrossEntropy
+                class KLCrossEntropyGradient
+                class KullbackLeiblerCrossEntropyConvexConj
+                class KLCrossEntCCGradient
+                class SeparableSum
+                class QuadraticForm
+                class NuclearNorm
+                class NuclearNormProximal
+                class IndicatorNuclearNormUnitBall
+                class IndicatorSimplex
+                class ProximalSimplex
+                class IndicatorSumConstraint
+                class ProximalSum
+                class MoreauEnvelope
+                class Huber
+                class HuberGradient
+
+                'Lp Norm
+                LpNorm ..|> Functional
+                LpNorm ..> L1Gradient
+                LpNorm ..> L2Gradient
+                LpNorm ..> IndicatorGroupLpUnitBall
+                'Indicator Lp Unit Ball
+                IndicatorLpUnitBall ..|> Functional
+                'L1 Gradient
+                L1Gradient ..|> Operator
+                'L2 Gradient
+                L2Gradient ..|> Operator
+                'Group L1 Norm
+                GroupL1Norm ..|> Functional
+                GroupL1Norm ..> IndicatorGroupL1UnitBall
+                GroupL1Norm ..> PointwiseNorm
+                'Group L1 Gradient
+                GroupL1Gradient ..|> Operator
+                'Indicator Group L1 Unit Ball
+                IndicatorGroupL1UnitBall ..|> Functional
+                IndicatorGroupL1UnitBall ..> GroupL1Norm
+                IndicatorGroupL1UnitBall ..> PointwiseNorm
+                'Indicator Group Lp UnitBall
+                IndicatorGroupLpUnitBall ..|> Functional
+                IndicatorGroupLpUnitBall ..> LpNorm
+                'L1Norm
+                L1Norm ..|> LpNorm
+                'L2Norm
+                L2Norm ..|> LpNorm
+                'L2Norm Squared
+                L2NormSquared ..|> Functional
+                L2NormSquared ..> ScalingOperator
+                'Constant Functional
+                ConstantFunctional ..|> Functional
+                ConstantFunctional ..> ZeroOperator
+                'Zero Functional
+                ZeroFunctional ..|> Functional
+                'Indicator Zero
+                IndicatorZero ..|> Functional
+                'Scaling Functional
+                ScalingFunctional ..|> Functional
+                ScalingFunctional ..|> ScalingOperator
+                ScalingFunctional ..> ConstantFunctional
+                'Identity Functional
+                IdentityFunctional ..|> Functional
+                'Indicator Box
+                IndicatorBox ..|> Functional
+                'Indicator Nonnegativity
+                IndicatorNonnegativity ..|> Functional
+                'Indicator Zero
+                IndicatorZero ..|> Functional
+                IndicatorZero ..> ZeroOperator
+                IndicatorZero ..> ConstantFunctional
+                'Kullback-Leibler
+                KullbackLeibler ..|> Functional
+                KullbackLeibler ..> KullbackLeiblerConvexConj
+                'Kullback-Leibler Gradient
+                KLGradient ..|> Operator
+                'Kullback-Leibler Convex Conjugate
+                KullbackLeiblerConvexConj ..|> Functional
+                KullbackLeiblerConvexConj ..> KullbackLeibler
+                'Kullback-Leibler Convex Conjugate Gradient
+                KLCCGradient ..|> Operator
+                'Kullback-Leibler Cross Entropy
+                KullbackLeiblerCrossEntropy..|> Functional
+                KullbackLeiblerCrossEntropy ..> KullbackLeiblerCrossEntropyConvexConj
+                'Kullback-Leibler Cross Entropy Gradient
+                KLCrossEntropyGradient ..|> Operator
+                'Kullback-Leibler Cross Entropy Convex Conjugate Gradient
+                KullbackLeiblerCrossEntropyConvexConj ..|> Functional
+                KullbackLeiblerCrossEntropyConvexConj ..> KullbackLeiblerCrossEntropy
+                'Kullback-Leibler Cross Entropy Convex Conjugate Gradient
+                KLCrossEntCCGradient ..|> Operator
+                'Separable Sum
+                SeparableSum ..|> Functional
+                SeparableSum ..> DiagonalOperator
+                'Quadratic Form
+                QuadraticForm ..|> Functional
+                QuadraticForm ..> ConstantOperator
+                'Nuclear Norm
+                NuclearNorm ..|> Functional
+                NuclearNorm ..> NuclearNormProximal
+                NuclearNorm ..> IndicatorNuclearNormUnitBall
+                NuclearNorm ..> LpNorm
+                NuclearNorm ..> PointwiseNorm
+                'Nuclear Norm Proximal
+                NuclearNormProximal ..|> Operator
+                'Indicator Nuclear Norm Unit Ball
+                IndicatorNuclearNormUnitBall ..|> Functional
+                IndicatorNuclearNormUnitBall ..> NuclearNorm
+                'Indicator Simplex
+                IndicatorSimplex ..|> Functional
+                IndicatorSimplex ..> ProximalSimplex
+                'Proximal Simplex
+                ProximalSimplex ..|> Operator
+                'Indicator Sum Constraint
+                IndicatorSumConstraint ..|> Functional
+                IndicatorSumConstraint ..> ProximalSum
+                'Proximal Sum
+                ProximalSum ..|> Operator
+                'Moreau Envelope
+                MoreauEnvelope ..|> Functional
+                MoreauEnvelope ..> ScalingOperator
+                'Huber
+                Huber ..|> Functional 
+                Huber ..> PointwiseNorm
+                Huber ..> L1Norm
+                Huber ..> GroupL1Norm
+                Huber ..> FunctionalQuadraticPerturb
+                Huber ..> HuberGradient
+                'Huber Gradient
+                HuberGradient ..|> Operator
+                HuberGradient ..> PointwiseNorm
+
+            }
+            
+            package derivatives <<Rectangle>>{
+                class NumericalDerivative
+                class NumericalGradient
+
+                'Numerical Derivative
+                NumericalDerivative ..|> Operator
+                'Numerical Gradient
+                NumericalGradient ..|> Operator
+            }
+
+            package example_funcs <<Rectangle>>{
+                class RosenbrockFunctional
+                class RosenbrockGradient
+
+                'Rosenbrock Functional
+                RosenbrockFunctional ..|> Functional 
+                RosenbrockFunctional ..> RosenbrockGradient
+                'Rosenbrock Gradient 
+                RosenbrockGradient ..|> Operator
+            }
+            
+              
+        }
+        package iterative <<Frame>>{
+
+        }
+        package nonsmooth <<Frame>>{
+            
+        }
+        package smooth <<Frame>>{
+            
+        }
+        package util <<Frame>>{
+            package callback <<Rectangle>>{
+                abstract class Callback
+                class _CallbackAnd
+                class _CallbackCompose
+                class CallbackStore
+                class CallbackApply
+                class CallbackPrintIteration
+                class CallbackPrintTiming
+                class CallbackPrint
+                class CallbackPrintNorm
+                class CallbackShow
+                class CallbackSaveToDisk
+                class CallbackSleep
+                class CallbackShowConvergence
+                class CallbackPrintHardwareUsage
+                class CallbackProgressBar
+
+                'Callback
+                Callback ..> _CallbackAnd
+                Callback ..> _CallbackCompose
+                '_CallbackAnd
+                _CallbackAnd ..|> Callback
+                '_CallbackCompose
+                _CallbackCompose ..|> Callback
+                'Callback Store
+                CallbackStore ..|> Callback
+                'Callback Apply
+                CallbackApply ..|> Callback
+                'Callback Print Iteration
+                CallbackPrintIteration ..|> Callback
+                'Callback Print Timing
+                CallbackPrintTiming ..|> Callback
+                'Callback Print
+                CallbackPrint ..|> Callback
+                'Callback Print Norm
+                CallbackPrintNorm ..|> Callback
+                'Callback Show
+                CallbackShow ..|> Callback
+                'Callback Save To Disk
+                CallbackSaveToDisk ..|> Callback
+                'Callback Sleep
+                CallbackSleep ..|> Callback
+                'Callback Show Convergence
+                CallbackShowConvergence ..|> Callback
+                'Callback Print Hardware Usage
+                CallbackPrintHardwareUsage ..|> Callback
+                'Callback Progress Bar
+                CallbackProgressBar ..|> Callback
+            }
+
+            package steplen <<Rectangle>>{
+                abstract class LineSearch
+                class BacktrackingLineSearch
+                class ConstantLineSearch
+                class LineSearchFromIterNum
+
+                'Backtracking Line Search
+                BacktrackingLineSearch ..|> LineSearch
+                'Constant Line Search
+                ConstantLineSearch ..|> LineSearch
+                'Line Search From Iter Num
+                LineSearchFromIterNum ..|> LineSearch
+            }
+        }
+    }
+    package tomo <<Folder>>{
+        package analytic <<Frame>>{
+            package filtered_backprojection <<Rectangle>>{
+                
+            }
+        }
+        package backends <<Frame>>{
+            package astra_cpu <<Rectangle>>{
+                class AstraCpuImpl
+            }
+            package astra_cuda <<Rectangle>>{
+                class AstraCudaImpl
+            }
+            package astra_setup <<Rectangle>>{
+                
+            }
+            package skimage_radon <<Rectangle>>{
+                class SkImageImpl
+            }
+            package util <<Rectangle>>{
+                
+            }
+        }
+        package geometry <<Frame>>{
+            package geometry <<Rectangle>>{
+                abstract class Geometry
+                abstract class DivergentBeamGeometry
+                class AxisOrientedGeometry
+
+                'Divergent Beam Geometry
+                DivergentBeamGeometry --|> Geometry
+            }
+            package detector <<Rectangle>>{
+                abstract class Detector
+                class Flat1dDetector
+                class CircularDetector
+                class Flat2dDetector
+                class SphericalDetector
+                class CylindricalDetector
+
+                'Detector
+                Detector ..> DiscretizedSpace
+                'Flat 1D Detector
+                Flat1dDetector ..|> Detector
+                'Circular Detector
+                Flat2dDetector ..|> Detector
+                'Flat 2D Detector
+                CircularDetector ..|> Detector
+                'Spherical Detector
+                SphericalDetector ..|> Detector
+                'Cylindrical Detector
+                CylindricalDetector ..|> Detector
+            }
+            package conebeam <<Rectangle>>{
+                class FanBeamGeometry
+                class ConeBeamGeometry
+
+                'Fan-Beam Geometry
+                FanBeamGeometry ..|> DivergentBeamGeometry
+                FanBeamGeometry .. Flat1dDetector
+                FanBeamGeometry .. CircularDetector
+                'Cone-Beam Geometry
+                ConeBeamGeometry ..|> DivergentBeamGeometry
+                ConeBeamGeometry ..|> AxisOrientedGeometry
+                ConeBeamGeometry ..> Flat2dDetector
+                ConeBeamGeometry ..> SphericalDetector
+                ConeBeamGeometry ..> CylindricalDetector
+            }
+            
+            
+            package parallel <<Rectangle>>{
+                abstract class ParallelBeamGeometry
+                class Parallel2dGeometry
+                class Parallel3dEulerGeometry
+                class Parallel3dAxisGeometry
+
+                'Parallel-Beam Geometry
+                ParallelBeamGeometry --|> Geometry
+                'Parallel 2D Geometry
+                Parallel2dGeometry ..|> ParallelBeamGeometry
+                Parallel2dGeometry ..> Flat1dDetector
+                'Parallel 3D Euler Geometry
+                Parallel3dEulerGeometry ..|> ParallelBeamGeometry
+                Parallel3dEulerGeometry ..> Flat2dDetector
+                'Parallel 3D Axis Geometry
+                Parallel3dAxisGeometry ..|> ParallelBeamGeometry
+                Parallel3dAxisGeometry ..|> AxisOrientedGeometry
+                Parallel3dAxisGeometry ..> Flat2dDetector
+            }
+            package spect <<Rectangle>>{
+                class ParallelHoleCollimatorGeometry
+
+                'Parallel-Hole Collimator Geometry 
+                ParallelHoleCollimatorGeometry ..|> Parallel3dAxisGeometry
+            }
+        }
+        package operators <<Frame>>{
+            package ray_trafo <<Rectangle>>{
+                class RayTransform
+                class RayBackProjection
+
+                'Ray Transform
+                RayTransform ..|> OperatorRayTransform 
+                RayTransform ..> DiscretizedSpace
+                RayTransform ..> Geometry
+                'Ray Back-Projection
+                RayBackProjection ..|> Operator
+            }
+        }
+        package util <<Frame>>{
+            package source_detector_shifts <<Rectangle>>{
+                
+            }
+            package testutils <<Rectangle>>{
+                
+            }
+            package utility <<Rectangle>>{
+                
+            }
+        }
+    }
+    package trafos <<Folder>>{
+        package backends <<Frame>>{
+            package pyfftw_bindings <<Rectangle>>{
+                
+            }
+            package pywt_bindings <<Rectangle>>{
+                
+            }
+        }
+        package util <<Frame>>{
+            package ft_utils <<Rectangle>>{
+                
+            }
+        }
+        package fourier <<Rectangle>>{
+            class DiscreteFourierTransformBase
+            class DiscreteFourierTransform
+            class DiscreteFourierTransformInverse
+            class FourierTransformBase
+            class FourierTransformInverse
+            class FourierTransform
+
+            'Discrete Fourier Transform Base
+            DiscreteFourierTransformBase --|> Operator
+            'Discrete Fourier Transform
+            DiscreteFourierTransform ..> DiscreteFourierTransformBase
+            'Discrete Fourier TransformInverse
+            DiscreteFourierTransformInverse ..> DiscreteFourierTransformBase
+            'Fourier Transform Base 
+            FourierTransformBase --|> Operator
+            FourierTransformBase ..> FourierTransformInverse
+            'Fourier Transform 
+            FourierTransform ..|> FourierTransformBase
+            'Fourier Transform Inverse
+            FourierTransformInverse ..|> FourierTransformBase
+        }
+        package wavelet <<Rectangle>>{
+            class WaveletTransformBase
+            class WaveletTransform
+            class WaveletTransformInverse
+
+            'Wavelet Transform Base
+            WaveletTransformBase --|> Operator
+            'Wavelet Transform
+            WaveletTransform ..|> WaveletTransformBase
+            WaveletTransform ..> WaveletTransformInverse
+            'Wavelet Transform Inverse
+            WaveletTransformInverse ..|> WaveletTransformBase
+            WaveletTransformInverse ..> WaveletTransform
+        }
+        
+    }
+    package util <<Folder>>{
+        package graphics <<Rectangle>>{
+                
+        }
+        package normalize <<Rectangle>>{
+                
+        }
+        package npy_compat <<Rectangle>>{
+                
+        }
+        package numerics <<Rectangle>>{
+                
+        }
+        package pytest_config <<Rectangle>>{
+                
+        }
+        package sparse <<Rectangle>>{
+            class COOMatrix
+        }
+        package testutils <<Rectangle>>{
+            class ProgressBar
+            class ProgressRange
+            ProgressRange ..> ProgressBar
+        }
+        package ufuncs <<Rectangle>>{
+            class TensorSpaceUfuncs
+            class ProductSpaceUfuncs
+        }
+        package utility <<Rectangle>>{
+                
+        }
+        package vectorization <<Rectangle>>{
+            abstract class OptionalArgDecorator
+            class vectorize
+            class _NumpyVectorizeWrapper
+
+            'vectorize
+            vectorize --|> OptionalArgDecorator
+            vectorize ..> _NumpyVectorizeWrapper
+
+        }
+    }
+}
+
+@enduml

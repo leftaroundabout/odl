@@ -331,47 +331,32 @@ def noise_array(space):
     odl.set.space.LinearSpace.examples : Examples of elements
         typical to the space.
     """
-    return space.as_compatible_array(noise_numpy_array(space))
-
-def noise_numpy_array(space):
-    
     from odl.space import ProductSpace
-    if isinstance(space, ProductSpace):
+    if isinstance(space, ProductSpace):    
+        return [noise_array(si) for si in space]
+    
+    else: 
+        return space.as_compatible_array(noise_numpy_array(space))
 
-        if space.is_power_space:
-            return np.array([noise_array(si) for si in space])
 
-        # Non-power–product-space elements are represented as arrays of arrays,
-        # each in general with a different shape. These cannot be monolithic
-        # NumPy arrays. NumPy allows non-rectangular arrays when explicitly
-        # requesting dtype=object, but these behave different from ordinary
-        # arrays in several ways. The following is a hack to have only the
-        # outer array with dtype=object but store the inner elements as for the
-        # constituent spaces. The resulting ragged arrays support some, but not
-        # all numerical operations.
-        result = np.array([None for si in space], dtype=object)
-        for i, si in enumerate(space):
-            result[i] = noise_array(si)
-        return result
-
+def noise_numpy_array(space):    
+    if space.dtype == bool:
+        arr = np.random.randint(0, 2, size=space.shape, dtype=bool)
+    elif np.issubdtype(space.dtype, np.unsignedinteger):
+        arr = np.random.randint(0, 10, space.shape)
+    elif np.issubdtype(space.dtype, np.signedinteger):
+        arr = np.random.randint(-10, 10, space.shape)
+    elif np.issubdtype(space.dtype, np.floating):
+        arr = np.random.randn(*space.shape)
+    elif np.issubdtype(space.dtype, np.complexfloating):
+        arr = (
+            np.random.randn(*space.shape)
+            + 1j * np.random.randn(*space.shape)
+        ) / np.sqrt(2.0)
     else:
-        if space.dtype == bool:
-            arr = np.random.randint(0, 2, size=space.shape, dtype=bool)
-        elif np.issubdtype(space.dtype, np.unsignedinteger):
-            arr = np.random.randint(0, 10, space.shape)
-        elif np.issubdtype(space.dtype, np.signedinteger):
-            arr = np.random.randint(-10, 10, space.shape)
-        elif np.issubdtype(space.dtype, np.floating):
-            arr = np.random.randn(*space.shape)
-        elif np.issubdtype(space.dtype, np.complexfloating):
-            arr = (
-                np.random.randn(*space.shape)
-                + 1j * np.random.randn(*space.shape)
-            ) / np.sqrt(2.0)
-        else:
-            raise ValueError('bad dtype {}'.format(space.dtype))
+        raise ValueError('bad dtype {}'.format(space.dtype))
 
-        return arr.astype(space.dtype, copy=AVOID_UNNECESSARY_COPY)
+    return arr.astype(space.dtype, copy=AVOID_UNNECESSARY_COPY)
 
 
 def noise_element(space):
