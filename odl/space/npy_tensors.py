@@ -491,7 +491,7 @@ class NumpyTensorSpace(TensorSpace):
         else:
             raise TypeError('cannot provide both `inp` and `data_ptr`')
 
-    def zero(self):
+    def zeros(self):
         """Return a tensor of all zeros.
 
         Examples
@@ -504,7 +504,7 @@ class NumpyTensorSpace(TensorSpace):
         return self.element(np.zeros(self.shape, dtype=self.dtype,
                                      order=self.default_order))
 
-    def one(self):
+    def ones(self):
         """Return a tensor of all ones.
 
         Examples

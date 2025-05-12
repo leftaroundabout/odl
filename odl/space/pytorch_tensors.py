@@ -489,7 +489,7 @@ class PytorchTensorSpace(TensorSpace):
         else:
             raise TypeError('cannot provide both `inp` and `data_ptr`')
 
-    def zero(self):
+    def zeros(self):
         """Return a tensor of all zeros.
 
         Examples
@@ -501,7 +501,7 @@ class PytorchTensorSpace(TensorSpace):
         """
         return self.element(torch.zeros(self.shape, dtype=self._torch_dtype))
 
-    def one(self):
+    def ones(self):
         """Return a tensor of all ones.
 
         Examples

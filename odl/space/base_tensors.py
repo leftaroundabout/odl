@@ -470,7 +470,7 @@ class TensorSpace(LinearSpace):
 
         np.random.set_state(rand_state)
 
-    def zero(self):
+    def zeros(self):
         """Return a tensor of all zeros.
 
         This method should be overridden by subclasses.
@@ -482,7 +482,7 @@ class TensorSpace(LinearSpace):
         """
         raise NotImplementedError('abstract method')
 
-    def one(self):
+    def ones(self):
         """Return a tensor of all ones.
 
         This method should be overridden by subclasses.
