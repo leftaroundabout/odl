@@ -737,30 +737,42 @@ class Tensor(LinearSpaceElement):
         else:
             return self.space.element(array)
         
-    def reduction(self, operation:str):
-        """Return the result of a reduction operation on the Tensor.
-
-        Parameters
-        ----------
-        operation :
-            String keyword for the reduction operation. Can be
-                - min
-                - max
-                - sum
-                - prod
+    def min(self):
+        """Return the Tensor's minimum value.
 
         Returns
         -------
-            scalar value of the reduction operation
+            Minimum of the tensor
         """
-        assert operation in ['min', 'max', 'sum', 'prod'], f' \
-        The provided operation {operation} is not supported. It can only be "min", \
-        "max", "sum", "prod"'        
+        return self.array_namespace.min(self.asarray())
+    
+    def max(self):
+        """Return the Tensor's maximum value.
 
-        function = getattr(self.array_namespace, operation)
+        Returns
+        -------
+            Maximum of the Tensor
+        """
+        return self.array_namespace.max(self.asarray())
+    
+    def sum(self):
+        """Return the sum of the Tensor values.
 
-        return function(self.asarray())
-        
+        Returns
+        -------
+            Sum of the Tensor values
+        """
+        return self.array_namespace.sum(self.asarray())
+    
+    def prod(self):
+        """Return the product of the Tensor values.
+
+        Returns
+        -------
+            product of the Tensor values
+        """
+        return self.array_namespace.prod(self.asarray())
+                
 
     def show(self, title=None, method='', indices=None, force_show=False,
              fig=None, **kwargs):
