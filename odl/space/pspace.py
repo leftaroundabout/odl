@@ -1170,34 +1170,41 @@ class ProductSpaceElement(LinearSpaceElement):
 
         return self.space.element(array)
 
-    def reduction(self, operation:str):
-        """Return the result of a reduction operation on the Tensor.
-
-        Parameters
-        ----------
-        operation :
-            String keyword for the reduction operation. Can be
-                - min
-                - max
-                - sum
-                - prod
+    def min(self):
+        """Return the TensorSpace's minimum value.
 
         Returns
         -------
-            scalar value of the reduction operation
-
-        Note
-        ----
-            The reduction on the individual spaces is performed with the backend associated
-            with each space, but the reduction on the product space is left to NumPy
+            Minimum of the TensorSpace
         """
-        assert operation in ['min', 'max', 'sum', 'prod'], f' \
-        The provided operation {operation} is not supported. It can only be "min", \
-        "max", "sum", "prod"'        
+        return np.min([x.min().to_device('cpu') for x in self.__parts])
+    
+    def max(self):
+        """Return the Tensor's maximum value.
 
-        function = getattr(np, operation)
+        Returns
+        -------
+            Maximum of the Tensor
+        """
+        return np.max([x.max().to_device('cpu') for x in self.__parts])
+    
+    def sum(self):
+        """Return the sum of the Tensor values.
 
-        return function([x.reduction(operation) for x in self.__parts])
+        Returns
+        -------
+            Sum of the Tensor values
+        """
+        return np.sum([x.sum().to_device('cpu') for x in self.__parts])
+    
+    def prod(self):
+        """Return the product of the Tensor values.
+
+        Returns
+        -------
+            product of the Tensor values
+        """
+        return np.prod([x.prod().to_device('cpu') for x in self.__parts])
 
 
     @property
