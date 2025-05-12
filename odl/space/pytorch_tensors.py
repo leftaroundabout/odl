@@ -30,6 +30,9 @@ from odl.util import (
     dtype_str, is_floating_dtype, is_numeric_dtype, is_real_dtype, nullcontext,
     signature_string, writable_array)
 
+
+import array_api_compat.torch as xp
+
 __all__ = ('PytorchTensorSpace',)
 
 
@@ -74,7 +77,7 @@ class PytorchTensorSpace(TensorSpace):
     .. _Wikipedia article on tensors: https://en.wikipedia.org/wiki/Tensor
     """
 
-    def __init__(self, shape, dtype=None, **kwargs):
+    def __init__(self, shape, dtype=None, device='cpu',**kwargs):
         r"""Initialize a new instance.
 
         Parameters
@@ -87,6 +90,10 @@ class PytorchTensorSpace(TensorSpace):
             way the `torch.dtype` function understands, e.g.
             as built-in type or as a string. For ``None``,
             the `default_dtype` of this space (``float64``) is used.
+        device : PyTorch device identifier
+            Where to store and process data (i.e. arrays) representing elements
+            of this space. Should typically be a GPU (cuda) if available, else
+            CPU as also used by NumPy.
         exponent : positive float, optional
             Exponent of the norm. For values other than 2.0, no
             inner product is defined.
@@ -98,11 +105,6 @@ class PytorchTensorSpace(TensorSpace):
 
         Other Parameters
         ----------------
-        torch_device : optional, PyTorch device identifier
-            Where to store and process data (i.e. arrays) representing elements
-            of this space. Should typically be a GPU (cuda) if available, else
-            CPU as also used by NumPy.
-
         weighting : optional
             Use weighted inner product, norm, and dist. The following
             types are supported as ``weighting``:
@@ -214,19 +216,18 @@ class PytorchTensorSpace(TensorSpace):
         >>> space.dtype
         dtype('float64')
         """
-        super(PytorchTensorSpace, self).__init__(shape, dtype)
+        super(PytorchTensorSpace, self).__init__(shape, dtype, device)
         if self.dtype not in self.available_dtypes():
             raise ValueError('`dtype` {!r} not supported'
                              ''.format(dtype_str(dtype)))
 
-        torch_device = kwargs.pop('torch_device', "cpu")
         dist = kwargs.pop('dist', None)
         norm = kwargs.pop('norm', None)
         inner = kwargs.pop('inner', None)
         weighting = kwargs.pop('weighting', None)
         exponent = kwargs.pop('exponent', getattr(weighting, 'exponent', 2.0))
 
-        self._torch_device = torch.device(torch_device)
+        self._device = torch.device(device)
 
         if (not is_numeric_dtype(self.dtype) and
                 any(x is not None for x in (dist, norm, inner, weighting))):
@@ -291,7 +292,19 @@ class PytorchTensorSpace(TensorSpace):
         # Make sure there are no leftover kwargs
         if kwargs:
             raise TypeError('got unknown keyword arguments {}'.format(kwargs))
-
+        
+    @property
+    def array_namespace(self):
+        """Name of the array_namespace"""
+        return xp
+    
+    @property
+    def array_type(self):
+        """Name of the array_type of this tensor set.
+        This relates to the python array api
+        """
+        return torch.Tensor
+    
     @property
     def impl(self):
         """Name of the implementation back-end: ``'pytorch'``."""
@@ -449,7 +462,7 @@ class PytorchTensorSpace(TensorSpace):
 
         if inp is None and data_ptr is None:
             return wrapped_array(torch.empty(
-               self.shape, dtype=self._torch_dtype, device=self._torch_device))
+               self.shape, dtype=self._torch_dtype, device=self._device))
 
         elif inp is None and data_ptr is not None:
             if order is None:
@@ -462,7 +475,7 @@ class PytorchTensorSpace(TensorSpace):
             arr = as_numpy_array.view(dtype=self._torch_dtype)
             arr = arr.reshape(self.shape, order=order)
             return wrapped_array(torch.tensor(
-                 arr, dtype=self._torch_dtype, device=self._torch_device))
+                 arr, dtype=self._torch_dtype, device=self._device))
 
         elif inp is not None and data_ptr is None:
             if inp in self and order is None:
@@ -470,7 +483,7 @@ class PytorchTensorSpace(TensorSpace):
                 return inp
 
             # TODO avoid copy when it's not necessary
-            return wrapped_array(ArrayOnPytorchManager(device=self._torch_device)
+            return wrapped_array(ArrayOnPytorchManager(device=self._device)
                                   .as_compatible_array(inp, dtype=self._torch_dtype))
 
         else:
