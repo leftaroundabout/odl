@@ -15,7 +15,7 @@ from odl.util.npy_compat import AVOID_UNNECESSARY_COPY
 
 from odl.set import RealNumbers, ComplexNumbers
 from odl.space.entry_points import tensor_space_impl
-
+from odl.space.base_tensors import TensorSpace
 
 __all__ = ('vector', 'tensor_space', 'cn', 'rn')
 
@@ -90,7 +90,9 @@ def vector(array, dtype=None, order=None, impl='numpy'):
     return space.element(arr)
 
 
-def tensor_space(shape, dtype=None, impl='numpy', **kwargs):
+def tensor_space(
+        shape, dtype=None, impl='numpy', device='cpu', **kwargs
+        ) -> TensorSpace:
     """Return a tensor space with arbitrary scalar data type.
 
     Parameters
@@ -148,7 +150,7 @@ def tensor_space(shape, dtype=None, impl='numpy', **kwargs):
 
     # Use args by keyword since the constructor may take other arguments
     # by position
-    return tspace_cls(shape=shape, dtype=dtype, **kwargs)
+    return tspace_cls(shape=shape, dtype=dtype, device=device, **kwargs)
 
 
 def cn(shape, dtype=None, impl='numpy', **kwargs):

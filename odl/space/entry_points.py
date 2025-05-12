@@ -22,6 +22,7 @@ NumpyTensorSpace : Numpy-based implementation of `TensorSpace`
 
 from __future__ import print_function, division, absolute_import
 
+from odl.space.base_tensors import TensorSpace
 from odl.space.npy_tensors import NumpyTensorSpace
 from odl.space.pytorch_tensors import PytorchTensorSpace
 
@@ -56,7 +57,7 @@ def tensor_space_impl_names():
     return tuple(TENSOR_SPACE_IMPLS.keys())
 
 
-def tensor_space_impl(impl):
+def tensor_space_impl(impl) -> TensorSpace:
     """Tensor space class corresponding to the given impl name.
 
     Parameters
