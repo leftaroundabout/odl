@@ -21,7 +21,6 @@ import numpy as np
 from odl.util.npy_compat import AVOID_UNNECESSARY_COPY
 
 from future.moves.itertools import zip_longest
-
 from odl.util.utility import is_string, run_from_ipython
 
 __all__ = (
@@ -313,7 +312,7 @@ def noise_array(space):
 
     Returns
     -------
-    noise_array : `numpy.ndarray` element
+    noise_array : TensorSpace element
         Array with white noise such that ``space.element``'s can be created
         from it.
 
@@ -336,27 +335,29 @@ def noise_array(space):
         return [noise_array(si) for si in space]
     
     else: 
-        return space.as_compatible_array(noise_numpy_array(space))
+        nr = space.element(inp=noise_numpy_array(space))
+        return nr
 
 
-def noise_numpy_array(space):    
-    if space.dtype == bool:
+
+def noise_numpy_array(space):  
+    if space.np_dtype == bool:
         arr = np.random.randint(0, 2, size=space.shape, dtype=bool)
-    elif np.issubdtype(space.dtype, np.unsignedinteger):
+    elif np.issubdtype(space.np_dtype, np.unsignedinteger):
         arr = np.random.randint(0, 10, space.shape)
-    elif np.issubdtype(space.dtype, np.signedinteger):
+    elif np.issubdtype(space.np_dtype, np.signedinteger):
         arr = np.random.randint(-10, 10, space.shape)
-    elif np.issubdtype(space.dtype, np.floating):
+    elif np.issubdtype(space.np_dtype, np.floating):
         arr = np.random.randn(*space.shape)
-    elif np.issubdtype(space.dtype, np.complexfloating):
+    elif np.issubdtype(space.np_dtype, np.complexfloating):
         arr = (
             np.random.randn(*space.shape)
             + 1j * np.random.randn(*space.shape)
         ) / np.sqrt(2.0)
     else:
-        raise ValueError('bad dtype {}'.format(space.dtype))
+        raise ValueError('bad dtype {}'.format(space.np_dtype))
 
-    return arr.astype(space.dtype, copy=AVOID_UNNECESSARY_COPY)
+    return arr
 
 
 def noise_element(space):
