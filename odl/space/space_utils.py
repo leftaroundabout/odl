@@ -13,9 +13,16 @@ import numpy as np
 
 from odl.util.npy_compat import AVOID_UNNECESSARY_COPY
 from odl.util.utility import AVAILABLE_DTYPES
-from odl.space.entry_points import TENSOR_SPACE_IMPLS, tensor_space_impl
+from odl.space.entry_points import tensor_space_impl
 from odl.set import RealNumbers, ComplexNumbers
 from odl.space.base_tensors import TensorSpace
+from odl.space.npy_tensors import NumpyTensorSpace
+from odl.space.pytorch_tensors import PytorchTensorSpace
+
+TENSOR_SPACE_IMPLS = {
+    'numpy': NumpyTensorSpace,
+    'pytorch': PytorchTensorSpace
+    }
 
 __all__ = ("vector", "tensor_space", "cn", "rn")
 
