@@ -5,7 +5,6 @@
 # This Source Code Form is subject to the terms of the Mozilla Public License,
 # v. 2.0. If a copy of the MPL was not distributed with this file, You can
 # obtain one at https://mozilla.org/MPL/2.0/.
-
 """Base classes for implementations of tensor spaces."""
 
 from __future__ import absolute_import, division, print_function
@@ -14,23 +13,34 @@ from types import ModuleType
 from numbers import Integral
 
 import numpy as np
-
+import torch
+import odl
 from odl.util.npy_compat import AVOID_UNNECESSARY_COPY
 
 from odl.set.sets import ComplexNumbers, RealNumbers
 from odl.set.space import LinearSpace, LinearSpaceElement
 from odl.util import (
-    array_str, dtype_str, indent, is_complex_floating_dtype, is_floating_dtype,
-    is_numeric_dtype, is_real_dtype, is_real_floating_dtype, safe_int_conv,
-    signature_string, writable_array)
+    array_str,
+    dtype_str,
+    indent,
+    is_complex_floating_dtype,
+    is_floating_dtype,
+    is_numeric_dtype,
+    is_real_floating_dtype,
+    safe_int_conv,
+    signature_string,
+)
 
-from odl.util.utility import TYPE_MAP_C2R, TYPE_MAP_R2C, nullcontext
+from odl.util.utility import (
+    TYPE_PROMOTION_REAL_TO_COMPLEX,
+    TYPE_PROMOTION_COMPLEX_TO_REAL,
+)
+import warnings
 
-__all__ = ('TensorSpace',)
+__all__ = ("TensorSpace",)
 
 
 class TensorSpace(LinearSpace):
-
     """Base class for sets of tensors of arbitrary data type.
 
     A tensor is, in the most general sense, a multi-dimensional array
@@ -77,7 +87,7 @@ class TensorSpace(LinearSpace):
             as built-in type or as a string.
             For a data type with a ``dtype.shape``, these extra dimensions
             are added *to the left* of ``shape``.
-        device : 
+        device :
             Device on which the data should be stored. Please see:
             https://data-apis.org/array-api/latest/design_topics/device_support.html#device-support
             for the guidelines on declaring your device
@@ -88,28 +98,28 @@ class TensorSpace(LinearSpace):
         except TypeError:
             shape, shape_in = (safe_int_conv(shape),), shape
         if any(s < 0 for s in shape):
-            raise ValueError('`shape` must have only nonnegative entries, got '
-                             '{}'.format(shape_in))
-        dtype = np.dtype(dtype)
+            raise ValueError(
+                "`shape` must have only nonnegative entries, got " "{}".format(shape_in)
+            )
+        # dtype = np.dtype(dtype)
 
         # We choose this order in contrast to Numpy, since we usually want
         # to represent discretizations of vector- or tensor-valued functions,
         # i.e., if dtype.shape == (3,) we expect f[0] to have shape `shape`.
-        self.__shape = dtype.shape + shape
-        self.__dtype = dtype.base
+        self.__shape = np.dtype(dtype).shape + shape
 
-        if is_real_dtype(self.dtype):
+        if dtype in TYPE_PROMOTION_REAL_TO_COMPLEX:
             # real includes non-floating-point like integers
             field = RealNumbers()
-            self.__real_dtype = self.dtype
+            self.__real_dtype = dtype
             self.__real_space = self
-            self.__complex_dtype = TYPE_MAP_R2C.get(self.dtype, None)
+            self.__complex_dtype = TYPE_PROMOTION_REAL_TO_COMPLEX[dtype]
             self.__complex_space = None  # Set in first call of astype
-        elif is_complex_floating_dtype(self.dtype):
+        elif dtype in TYPE_PROMOTION_COMPLEX_TO_REAL:
             field = ComplexNumbers()
-            self.__real_dtype = TYPE_MAP_C2R[self.dtype]
+            self.__real_dtype = TYPE_PROMOTION_COMPLEX_TO_REAL[dtype]
             self.__real_space = None  # Set in first call of astype
-            self.__complex_dtype = self.dtype
+            self.__complex_dtype = dtype
             self.__complex_space = self
         else:
             field = None
@@ -118,23 +128,21 @@ class TensorSpace(LinearSpace):
 
     @property
     def array_namespace(self) -> ModuleType:
-        """Name of the array_namespace of this tensor set.
-        This relates to the python array api
+        """Name of the array_namespace of this tensor set. This relates to the
+        python array api.
 
         This property should be overridden by subclasses.
-
         """
-        raise NotImplementedError('abstract method')
-    
+        raise NotImplementedError("abstract method")
+
     @property
     def array_type(self):
-        """Name of the array_type of this tensor set.
-        This relates to the python array api
+        """Name of the array_type of this tensor set. This relates to the
+        python array api.
 
         This property should be overridden by subclasses.
-
         """
-        raise NotImplementedError('abstract method')
+        raise NotImplementedError("abstract method")
 
     @property
     def impl(self):
@@ -142,7 +150,7 @@ class TensorSpace(LinearSpace):
 
         This property should be overridden by subclasses.
         """
-        raise NotImplementedError('abstract method')
+        raise NotImplementedError("abstract method")
 
     @property
     def shape(self):
@@ -162,12 +170,12 @@ class TensorSpace(LinearSpace):
     @property
     def dtype(self):
         """Scalar data type of each entry in an element of this space."""
-        return self.__dtype
-    
+        raise NotImplementedError("Dtype attribute not implemented")
+
     @property
     def device(self):
         """Device identifier."""
-        raise NotImplementedError('Device attribute not implemented')
+        raise NotImplementedError("Device attribute not implemented")
 
     @property
     def is_real(self):
@@ -190,7 +198,8 @@ class TensorSpace(LinearSpace):
         """
         if not is_numeric_dtype(self.dtype):
             raise NotImplementedError(
-                '`real_dtype` not defined for non-numeric `dtype`')
+                "`real_dtype` not defined for non-numeric `dtype`"
+            )
         return self.__real_dtype
 
     @property
@@ -204,7 +213,8 @@ class TensorSpace(LinearSpace):
         """
         if not is_numeric_dtype(self.dtype):
             raise NotImplementedError(
-                '`complex_dtype` not defined for non-numeric `dtype`')
+                "`complex_dtype` not defined for non-numeric `dtype`"
+            )
         return self.__complex_dtype
 
     @property
@@ -217,8 +227,7 @@ class TensorSpace(LinearSpace):
             If `dtype` is not a numeric data type.
         """
         if not is_numeric_dtype(self.dtype):
-            raise ValueError(
-                '`real_space` not defined for non-numeric `dtype`')
+            raise ValueError("`real_space` not defined for non-numeric `dtype`")
         return self.astype(self.real_dtype)
 
     @property
@@ -231,14 +240,16 @@ class TensorSpace(LinearSpace):
             If `dtype` is not a numeric data type.
         """
         if not is_numeric_dtype(self.dtype):
-            raise ValueError(
-                '`complex_space` not defined for non-numeric `dtype`')
+            raise ValueError("`complex_space` not defined for non-numeric `dtype`")
         return self.astype(self.complex_dtype)
-    
-    def as_compatible_array(self, array):
-        """Conversion of one array to the type of the tensor space
+
+    @property
+    def tensor_type(self):
+        """Name of the TensorType associated with this tensor set.
+
+        This property should be overridden by subclasses.
         """
-        return self.array_namespace.from_dlpack(array)
+        raise NotImplementedError("abstract method")
 
     def _astype(self, dtype):
         """Internal helper for `astype`.
@@ -250,9 +261,9 @@ class TensorSpace(LinearSpace):
         if is_floating_dtype(dtype):
             # Use weighting only for floating-point types, otherwise, e.g.,
             # `space.astype(bool)` would fail
-            weighting = getattr(self, 'weighting', None)
+            weighting = getattr(self, "weighting", None)
             if weighting is not None:
-                kwargs['weighting'] = weighting
+                kwargs["weighting"] = weighting
 
         return type(self)(self.shape, dtype=dtype, **kwargs)
 
@@ -274,7 +285,7 @@ class TensorSpace(LinearSpace):
         """
         if dtype is None:
             # Need to filter this out since Numpy iterprets it as 'float'
-            raise ValueError('`None` is not a valid data type')
+            raise ValueError("`None` is not a valid data type")
 
         dtype = np.dtype(dtype)
         if dtype == self.dtype:
@@ -301,13 +312,12 @@ class TensorSpace(LinearSpace):
 
         This property should be overridden by subclasses.
         """
-        raise NotImplementedError('abstract method')
+        raise NotImplementedError("abstract method")
 
     @property
     def size(self):
         """Total number of entries in an element of this space."""
-        return (0 if self.shape == () else
-                int(np.prod(self.shape, dtype='int64')))
+        return 0 if self.shape == () else int(np.prod(self.shape, dtype="int64"))
 
     @property
     def ndim(self):
@@ -327,6 +337,13 @@ class TensorSpace(LinearSpace):
     def nbytes(self):
         """Total number of bytes in memory used by an element of this space."""
         return self.size * self.itemsize
+
+    def np_dtype(self):
+        """Equivalent numpy type of space.type.
+
+        This method should be overridden by subclasses.
+        """
+        raise NotImplementedError("abstract method")
 
     def __contains__(self, other):
         """Return ``other in self``.
@@ -390,7 +407,7 @@ class TensorSpace(LinearSpace):
         >>> False in spc
         False
         """
-        return getattr(other, 'space', None) == self
+        return getattr(other, "space", None) == self
 
     def __eq__(self, other):
         """Return ``self == other``.
@@ -425,9 +442,11 @@ class TensorSpace(LinearSpace):
         if other is self:
             return True
 
-        return (type(other) is type(self) and
-                self.shape == other.shape and
-                self.dtype == other.dtype)
+        return (
+            type(other) is type(self)
+            and self.shape == other.shape
+            and self.dtype == other.dtype
+        )
 
     def __hash__(self):
         """Return ``hash(self)``."""
@@ -436,8 +455,7 @@ class TensorSpace(LinearSpace):
     def __repr__(self):
         """Return ``repr(self)``."""
         posargs = [self.shape, dtype_str(self.dtype)]
-        return "{}({})".format(self.__class__.__name__,
-                               signature_string(posargs, []))
+        return "{}({})".format(self.__class__.__name__, signature_string(posargs, []))
 
     def __str__(self):
         """Return ``str(self)``."""
@@ -451,22 +469,33 @@ class TensorSpace(LinearSpace):
         np.random.seed(1337)
 
         if is_numeric_dtype(self.dtype):
-            yield ('Linearly spaced samples', self.element(
-                np.linspace(0, 1, self.size).reshape(self.shape)))
-            yield ('Normally distributed noise',
-                   self.element(np.random.standard_normal(self.shape)))
+            yield (
+                "Linearly spaced samples",
+                self.element(np.linspace(0, 1, self.size).reshape(self.shape)),
+            )
+            yield (
+                "Normally distributed noise",
+                self.element(np.random.standard_normal(self.shape)),
+            )
 
         if self.is_real:
-            yield ('Uniformly distributed noise',
-                   self.element(np.random.uniform(size=self.shape)))
+            yield (
+                "Uniformly distributed noise",
+                self.element(np.random.uniform(size=self.shape)),
+            )
         elif self.is_complex:
-            yield ('Uniformly distributed noise',
-                   self.element(np.random.uniform(size=self.shape) +
-                                np.random.uniform(size=self.shape) * 1j))
+            yield (
+                "Uniformly distributed noise",
+                self.element(
+                    np.random.uniform(size=self.shape)
+                    + np.random.uniform(size=self.shape) * 1j
+                ),
+            )
         else:
             # TODO: return something that always works, like zeros or ones?
-            raise NotImplementedError('no examples available for non-numeric'
-                                      'data type')
+            raise NotImplementedError(
+                "no examples available for non-numeric" "data type"
+            )
 
         np.random.set_state(rand_state)
 
@@ -480,7 +509,9 @@ class TensorSpace(LinearSpace):
         zero : `Tensor`
             A tensor of all zeros.
         """
-        raise NotImplementedError('abstract method')
+        return self.element(
+            self.array_namespace.zeros(self.shape, dtype=self.dtype, device=self.device)
+        )
 
     def ones(self):
         """Return a tensor of all ones.
@@ -492,21 +523,23 @@ class TensorSpace(LinearSpace):
         one : `Tensor`
             A tensor of all one.
         """
-        raise NotImplementedError('abstract method')
+        return self.element(
+            self.array_namespace.ones(self.shape, dtype=self.dtype, device=self.device)
+        )
 
     def _multiply(self, x1, x2, out):
         """The entry-wise product of two tensors, assigned to ``out``.
 
         This method should be overridden by subclasses.
         """
-        raise NotImplementedError('abstract method')
+        raise NotImplementedError("abstract method")
 
     def _divide(self, x1, x2, out):
         """The entry-wise quotient of two tensors, assigned to ``out``.
 
         This method should be overridden by subclasses.
         """
-        raise NotImplementedError('abstract method')
+        raise NotImplementedError("abstract method")
 
     @staticmethod
     def default_dtype(field=None):
@@ -524,29 +557,88 @@ class TensorSpace(LinearSpace):
         dtype :
             Numpy data type specifier.
         """
-        raise NotImplementedError('abstract method')
+        raise NotImplementedError("abstract method")
 
-    @staticmethod
-    def available_dtypes():
-        """Return the set of data types available in this implementation.
+    def element(self, inp=None, device=None, copy=True):
+        def wrapped_array(arr):
+            if arr.shape != self.shape:
+                raise ValueError(
+                    "shape of `inp` not equal to space shape: "
+                    "{} != {}".format(arr.shape, self.shape)
+                )
+            ### This is a temporary fix, until pytorch provides the right API for astype()!!
+            # very ugly implementation as of now >:(
+            try:
+                return self.tensor_type(self, arr.astype(self.dtype))
+            except AttributeError:
+                return self.tensor_type(self, torch.asarray(arr, dtype=self.dtype, device=self.device))
 
-        This method should be overridden by subclasses.
-        """
-        raise NotImplementedError('abstract method')
 
-    @property
-    def element_type(self):
-        """Type of elements in this space: `Tensor`."""
-        return Tensor
+        def dlpack_transfer(arr, device=None, copy=True):
+            # We check that the object implements the dlpack protocol:
+            assert hasattr(inp, "__dlpack_device__") and hasattr(
+                arr, "__dlpack__"
+            ), """The input does not support the DLpack framework. 
+                Please convert it to an object that supports it first. 
+            (cf:https://data-apis.org/array-api/latest/purpose_and_scope.html)"""
+            try:
+                # from_dlpack(inp, device=device, copy=copy)
+                # As of Pytorch 2.7, the pytorch API from_dlpack does not implement the
+                # keywords that specify the device and copy arguments
+                return self.array_namespace.from_dlpack(arr)
+            except BufferError:
+                raise BufferError(
+                    "The data cannot be exported as DLPack (e.g., incompatible dtype, strides, or device). "
+                    "It may also be that the export fails for other reasons "
+                    "(e.g., not enough memory available to materialize the data)."
+                    ""
+                )
+            except ValueError:
+                raise ValueError(
+                    "The data exchange is possible via an explicit copy but copy is set to False."
+                )
+            ### This is a temporary fix, until pytorch provides the right API for dlpack with args!!
+            # this should be raised only when using a GPU device, very ugly implementation as of now >:(
+            except RuntimeError:
+                if self.impl == 'pytorch':                    
+                    return torch.asarray(arr, device=self.device, dtype=self.dtype)
+                elif self.impl == 'numpy':
+                    if isinstance(arr, torch.Tensor):
+                        arr = arr.detach().cpu()
+                    return np.asarray(arr, dtype=self.dtype)
+                else:
+                    raise NotImplementedError
+
+        # Case 1: no input provided
+        if inp is None:
+            return wrapped_array(
+                self.array_namespace.empty(
+                    self.shape, dtype=self.dtype, device=self.device
+                )
+            )
+
+        # Case 2: input is provided
+        # Case 2.1: the input is an ODL OBJECT
+        if hasattr(inp, "odl_tensor"):
+            return wrapped_array(dlpack_transfer(inp.data, device, copy))
+        # Case 2.2: the input is an object that implements the python array aPI (np.ndarray, torch.Tensor...)
+        elif hasattr(inp, '__array__'):
+            return wrapped_array(dlpack_transfer(inp, device, copy))
+        # Case 2.3: the input is an array like object [[1,2,3],[4,5,6],...]
+        # TODO: Add the iterable type instead of list and tuple and the numerics type instead of int, float, complex
+        elif isinstance(inp, (int, float, complex, list, tuple)):
+            return wrapped_array(self.array_namespace.asarray(inp, device, copy))
+        else:
+            raise ValueError        
 
 
 class Tensor(LinearSpaceElement):
-
     """Abstract class for representation of `TensorSpace` elements."""
 
     def asarray(self, out=None):
-        """Extract the data of this tensor as an array. This could be a NumPy array
-        or a PyTorch tensor, depending on what implementation backend is used.
+        """Extract the data of this tensor as an array. This could be a NumPy
+        array or a PyTorch tensor, depending on what implementation backend is
+        used.
 
         This method should be overridden by subclasses.
 
@@ -562,7 +654,7 @@ class Tensor(LinearSpaceElement):
             If ``out`` was given, the returned object is a reference
             to it.
         """
-        raise NotImplementedError('abstract method')
+        raise NotImplementedError("abstract method")
 
     def __getitem__(self, indices):
         """Return ``self[indices]``.
@@ -582,7 +674,7 @@ class Tensor(LinearSpaceElement):
             the implementation, the returned object may be a (writable)
             view into the original array.
         """
-        raise NotImplementedError('abstract method')
+        raise NotImplementedError("abstract method")
 
     def __setitem__(self, indices, values):
         """Implement ``self[indices] = values``.
@@ -602,18 +694,20 @@ class Tensor(LinearSpaceElement):
             If ``index`` is a slice or a sequence of slices, ``value``
             must be broadcastable to the shape of the slice.
         """
-        raise NotImplementedError('abstract method')
+        raise NotImplementedError("abstract method")
 
     @property
     def array_namespace(self) -> ModuleType:
         """Name of the array_namespace of this tensor.
+
         This relates to the python array api
         """
         return self.space.array_namespace
-    
+
     @property
     def array_type(self):
         """Name of the array_type of this tensor set.
+
         This relates to the python array api
         """
         return self.space.array_type
@@ -643,6 +737,11 @@ class Tensor(LinearSpaceElement):
         """Number of axes (=dimensions) of this tensor."""
         return self.space.ndim
 
+    @property
+    def odl_tensor(self):
+        """Number of axes (=dimensions) of this tensor."""
+        return True
+
     def __len__(self):
         """Return ``len(self)``.
 
@@ -660,6 +759,37 @@ class Tensor(LinearSpaceElement):
         """Total number of bytes in memory occupied by this tensor."""
         return self.space.nbytes
 
+    ############### Magic functions  ###############
+    def __add__(self, other):
+        if hasattr(other, "odl_tensor"):
+            return odl.add(self, other)
+        
+        elif hasattr(other, '__array__'):
+            return odl.add(self, self.space.element(other))
+        
+        elif isinstance(other, (int, float, complex)):
+            return self.space.element(self.data + other)
+        
+        else:
+            raise NotImplementedError
+        
+    def __sub__(self, other):
+        if hasattr(other, "odl_tensor"):
+            return odl.subtract(self, other)
+        
+        elif hasattr(other, '__array__'):
+            return odl.subtract(self, self.space.element(other))
+        
+        elif isinstance(other, (int, float, complex)):
+            return self.space.element(self.data - other)
+        
+        else:
+            raise NotImplementedError
+    
+    def __rsub__(self, other):
+        return (-self).__add__(other)
+
+
     def astype(self, dtype):
         """Return a copy of this element with new ``dtype``.
 
@@ -676,16 +806,16 @@ class Tensor(LinearSpaceElement):
         newelem : `Tensor`
             Version of this element with given data type.
         """
-        raise NotImplementedError('abstract method')
+        raise NotImplementedError("abstract method")
 
     def __repr__(self):
         """Return ``repr(self)``."""
-        maxsize_full_print = 2 * np.get_printoptions()['edgeitems']
+        maxsize_full_print = 2 * np.get_printoptions()["edgeitems"]
         self_str = array_str(self, nprint=maxsize_full_print)
         if self.ndim == 1 and self.size <= maxsize_full_print:
-            return '{!r}.element({})'.format(self.space, self_str)
+            return "{!r}.element({})".format(self.space, self_str)
         else:
-            return '{!r}.element(\n{}\n)'.format(self.space, indent(self_str))
+            return "{!r}.element(\n{}\n)".format(self.space, indent(self_str))
 
     def __str__(self):
         """Return ``str(self)``."""
@@ -694,16 +824,17 @@ class Tensor(LinearSpaceElement):
     def __bool__(self):
         """Return ``bool(self)``."""
         if self.size > 1:
-            raise ValueError('The truth value of an array with more than one '
-                             'element is ambiguous. '
-                             'Use np.any(a) or np.all(a)')
+            raise ValueError(
+                "The truth value of an array with more than one "
+                "element is ambiguous. "
+                "Use np.any(a) or np.all(a)"
+            )
         else:
             return bool(self.asarray())
 
     def __array__(self, dtype=None):
-        """Return a Numpy array from this tensor.
-        (Contrast with the `asarray` method, which may give other types of array,
-        not just NumPy.)
+        """Return a Numpy array from this tensor. (Contrast with the `asarray`
+        method, which may give other types of array, not just NumPy.)
 
         Parameters
         ----------
@@ -736,7 +867,7 @@ class Tensor(LinearSpaceElement):
             return self.space.field.element(array)
         else:
             return self.space.element(array)
-        
+
     def min(self):
         """Return the Tensor's minimum value.
 
@@ -745,7 +876,7 @@ class Tensor(LinearSpaceElement):
             Minimum of the tensor
         """
         return self.array_namespace.min(self.asarray())
-    
+
     def max(self):
         """Return the Tensor's maximum value.
 
@@ -754,7 +885,7 @@ class Tensor(LinearSpaceElement):
             Maximum of the Tensor
         """
         return self.array_namespace.max(self.asarray())
-    
+
     def sum(self):
         """Return the sum of the Tensor values.
 
@@ -763,7 +894,7 @@ class Tensor(LinearSpaceElement):
             Sum of the Tensor values
         """
         return self.array_namespace.sum(self.asarray())
-    
+
     def prod(self):
         """Return the product of the Tensor values.
 
@@ -772,10 +903,10 @@ class Tensor(LinearSpaceElement):
             product of the Tensor values
         """
         return self.array_namespace.prod(self.asarray())
-                
 
-    def show(self, title=None, method='', indices=None, force_show=False,
-             fig=None, **kwargs):
+    def show(
+        self, title=None, method="", indices=None, force_show=False, fig=None, **kwargs
+    ):
         """Display the function graphically.
 
         Parameters
@@ -838,9 +969,7 @@ class Tensor(LinearSpaceElement):
 
         # Default to showing x-y slice "in the middle"
         if indices is None and self.ndim >= 3:
-            indices = tuple(
-                [slice(None)] * 2 + [n // 2 for n in self.space.shape[2:]]
-            )
+            indices = tuple([slice(None)] * 2 + [n // 2 for n in self.space.shape[2:]])
 
         if isinstance(indices, (Integral, slice)):
             indices = (indices,)
@@ -855,30 +984,37 @@ class Tensor(LinearSpaceElement):
         if Ellipsis in indices:
             # Replace Ellipsis with the correct number of [:] expressions
             pos = indices.index(Ellipsis)
-            indices = (indices[:pos] +
-                       (np.s_[:], ) * (self.ndim - len(indices) + 1) +
-                       indices[pos + 1:])
+            indices = (
+                indices[:pos]
+                + (np.s_[:],) * (self.ndim - len(indices) + 1)
+                + indices[pos + 1 :]
+            )
 
         if len(indices) < self.ndim:
-            raise ValueError('too few axes ({} < {})'.format(len(indices),
-                                                             self.ndim))
+            raise ValueError("too few axes ({} < {})".format(len(indices), self.ndim))
         if len(indices) > self.ndim:
-            raise ValueError('too many axes ({} > {})'.format(len(indices),
-                                                              self.ndim))
+            raise ValueError("too many axes ({} > {})".format(len(indices), self.ndim))
 
         # Squeeze grid and values according to the index expression
-        full_grid = uniform_grid([0] * self.ndim, np.array(self.shape) - 1,
-                                 self.shape)
+        full_grid = uniform_grid([0] * self.ndim, np.array(self.shape) - 1, self.shape)
         grid = full_grid[indices].squeeze()
         data = self.asarray()
         if not isinstance(data, np.ndarray):
-            data = data.to_device('cpu')
+            data = data.to_device("cpu")
         values = data[indices].squeeze()
 
-        return show_discrete_data(values, grid, title=title, method=method,
-                                  force_show=force_show, fig=fig, **kwargs)
+        return show_discrete_data(
+            values,
+            grid,
+            title=title,
+            method=method,
+            force_show=force_show,
+            fig=fig,
+            **kwargs
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from odl.util.testutils import run_doctests
+
     run_doctests()
