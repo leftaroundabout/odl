@@ -17,8 +17,6 @@ from functools import partial
 
 import numpy as np
 
-from odl.util.npy_compat import AVOID_UNNECESSARY_COPY
-
 from odl.set.sets import ComplexNumbers, RealNumbers
 from odl.set.space import (LinearSpaceTypeError,
         SupportedNumOperationParadigms, NumOperationParadigmSupport)
@@ -27,13 +25,28 @@ from odl.space.weighting import (
     ArrayWeighting, ConstWeighting, CustomDist, CustomInner, CustomNorm,
     Weighting)
 from odl.util import (
-    dtype_str, is_floating_dtype, is_numeric_dtype, is_real_dtype, nullcontext,
-    signature_string, writable_array)
+    dtype_str, is_numeric_dtype, is_real_dtype,
+    signature_string)
 
 import array_api_compat.numpy as xp
 
-__all__ = ('NumpyTensorSpace',)
+__all__ = ('NumpyTensorSpace', "NUMPY_DTYPES")
 
+NUMPY_DTYPES = {
+        "bool": np.bool,
+        "int8": np.int8,
+        "int16": np.int16,
+        "int32": np.int32,
+        "int64": np.int64,
+        "uint8": np.uint8,
+        "uint16": np.uint16,
+        "uint32": np.uint32,
+        "uint64": np.uint64,
+        "float32": np.float32,
+        "float64": np.float64,
+        "complex64": np.complex64,
+        "complex128": np.complex128,
+    }
 
 _BLAS_DTYPES = (np.dtype('float32'), np.dtype('float64'),
                 np.dtype('complex64'), np.dtype('complex128'))
@@ -92,7 +105,7 @@ class NumpyTensorSpace(TensorSpace):
             way the `numpy.dtype` function understands, e.g.
             as built-in type or as a string. For ``None``,
             the `default_dtype` of this space (``float64``) is used.
-        device : 
+        device :
             Device on which the data is. It must be 'cpu'.
         exponent : positive float, optional
             Exponent of the norm. For values other than 2.0, no
@@ -226,10 +239,14 @@ class NumpyTensorSpace(TensorSpace):
         tensor_space((2, 3), dtype=int)
         """
         super(NumpyTensorSpace, self).__init__(shape, dtype, device)
-        if self.dtype.char not in self.available_dtypes():
-            raise ValueError('`dtype` {!r} not supported'
-                             ''.format(dtype_str(dtype)))
 
+        if dtype not in NUMPY_DTYPES:
+            raise ValueError('`dtype` {!r} not supported'
+                             ''.format(dtype))
+        
+        self.__dtype_as_str = dtype
+        self.__dtype = NUMPY_DTYPES[dtype]
+        
         ### Unpacking the device argument
         assert device == 'cpu', f"Only 'cpu' is supported for numpy tensor space, got {device}"
         dist = kwargs.pop('dist', None)
@@ -304,7 +321,7 @@ class NumpyTensorSpace(TensorSpace):
     def array_namespace(self):
         """Name of the array_namespace"""
         return xp
-    
+
     @property
     def array_type(self):
         """Name of the array_type of this tensor set.
@@ -317,6 +334,16 @@ class NumpyTensorSpace(TensorSpace):
         """Name of the implementation back-end: ``'numpy'``."""
         return 'numpy'
 
+    @property
+    def dtype(self):
+        """Scalar data type of each entry in an element of this space."""
+        return self.__dtype
+
+    @property
+    def dtype_as_str(self):
+        """Scalar data type of each entry in an element of this space as a string."""
+        return self.__dtype_as_str
+    
     @property
     def supported_num_operation_paradigms(self) -> NumOperationParadigmSupport:
         """NumPy has full support for in-place operation, which is usually
@@ -331,7 +358,7 @@ class NumpyTensorSpace(TensorSpace):
             return SupportedNumOperationParadigms(
                     in_place = NumOperationParadigmSupport.NOT_SUPPORTED,
                     out_of_place = NumOperationParadigmSupport.PREFERRED)
-    
+
     @property
     def device(self):
         """Device identifier."""
@@ -359,183 +386,10 @@ class NumpyTensorSpace(TensorSpace):
         """Exponent of the norm and the distance."""
         return self.weighting.exponent
     
-    def as_compatible_array(self, array):
-        """Conversion of one array to the type of the tensor space
-        """
-        if isinstance(array, np.ndarray):
-            return array
-        
-        return np.array(xp.from_dlpack(array), copy=True)
-
-    def element(self, inp=None, data_ptr=None, order=None):
-        """Create a new element.
-
-        Parameters
-        ----------
-        inp : `array-like`, optional
-            Input used to initialize the new element.
-
-            If ``inp`` is `None`, an empty element is created with no
-            guarantee of its state (memory allocation only).
-            The new element will use ``order`` as storage order if
-            provided, otherwise `default_order`.
-
-            Otherwise, a copy is avoided whenever possible. This requires
-            correct `shape` and `dtype`, and if ``order`` is provided,
-            also contiguousness in that ordering. If any of these
-            conditions is not met, a copy is made.
-
-        data_ptr : int, optional
-            Pointer to the start memory address of a contiguous Numpy array
-            or an equivalent raw container with the same total number of
-            bytes. For this option, ``order`` must be either ``'C'`` or
-            ``'F'``.
-            The option is also mutually exclusive with ``inp``.
-        order : {None, 'C', 'F'}, optional
-            Storage order of the returned element. For ``'C'`` and ``'F'``,
-            contiguous memory in the respective ordering is enforced.
-            The default ``None`` enforces no contiguousness.
-
-        Returns
-        -------
-        element : `NumpyTensor`
-            The new element, created from ``inp`` or from scratch.
-
-        Examples
-        --------
-        Without arguments, an uninitialized element is created. With an
-        array-like input, the element can be initialized:
-
-        >>> space = odl.rn(3)
-        >>> empty = space.element()
-        >>> empty.shape
-        (3,)
-        >>> empty.space
-        rn(3)
-        >>> x = space.element([1, 2, 3])
-        >>> x
-        rn(3).element([ 1.,  2.,  3.])
-
-        If the input already is a `numpy.ndarray` of correct `dtype`, it
-        will merely be wrapped, i.e., both array and space element access
-        the same memory, such that mutations will affect both:
-
-        >>> arr = np.array([1, 2, 3], dtype=float)
-        >>> elem = odl.rn(3).element(arr)
-        >>> elem[0] = 0
-        >>> elem
-        rn(3).element([ 0.,  2.,  3.])
-        >>> arr
-        array([ 0.,  2.,  3.])
-
-        Elements can also be constructed from a data pointer, resulting
-        again in shared memory:
-
-        >>> int_space = odl.tensor_space((2, 3), dtype=int)
-        >>> arr = np.array([[1, 2, 3],
-        ...                 [4, 5, 6]], dtype=int, order='F')
-        >>> ptr = arr.ctypes.data
-        >>> y = int_space.element(data_ptr=ptr, order='F')
-        >>> y
-        tensor_space((2, 3), dtype=int).element(
-            [[1, 2, 3],
-             [4, 5, 6]]
-        )
-        >>> y[0, 1] = -1
-        >>> arr
-        array([[ 1, -1,  3],
-               [ 4,  5,  6]])
-        """
-        if order is not None and str(order).upper() not in ('C', 'F'):
-            raise ValueError("`order` {!r} not understood".format(order))
-
-        if inp is None and data_ptr is None:
-            if order is None:
-                arr = np.empty(self.shape, dtype=self.dtype,
-                               order=self.default_order)
-            else:
-                arr = np.empty(self.shape, dtype=self.dtype, order=order)
-
-            return self.element_type(self, arr)
-
-        elif inp is None and data_ptr is not None:
-            if order is None:
-                raise ValueError('`order` cannot be None for element '
-                                 'creation from pointer')
-
-            ctype_array_def = ctypes.c_byte * self.nbytes
-            as_ctype_array = ctype_array_def.from_address(data_ptr)
-            as_numpy_array = np.ctypeslib.as_array(as_ctype_array)
-            arr = as_numpy_array.view(dtype=self.dtype)
-            arr = arr.reshape(self.shape, order=order)
-            return self.element_type(self, arr)
-
-        elif inp is not None and data_ptr is None:
-            if inp in self and order is None:
-                # Short-circuit for space elements and no enforced ordering
-                return inp
-
-            # Try to not copy but require dtype and order if given
-            # (`order=None` is ok as np.array argument)
-            arr = np.array(inp, copy=AVOID_UNNECESSARY_COPY, dtype=self.dtype, ndmin=self.ndim,
-                           order=order)
-            # Make sure the result is writeable, if not make copy.
-            # This happens for e.g. results of `np.broadcast_to()`.
-            if not arr.flags.writeable:
-                arr = arr.copy()
-            if arr.shape != self.shape:
-                raise ValueError('shape of `inp` not equal to space shape: '
-                                 '{} != {}'.format(arr.shape, self.shape))
-            return self.element_type(self, arr)
-
-        else:
-            raise TypeError('cannot provide both `inp` and `data_ptr`')
-
-    def zeros(self):
-        """Return a tensor of all zeros.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)
-        >>> x = space.zero()
-        >>> x
-        rn(3).element([ 0.,  0.,  0.])
-        """
-        return self.element(np.zeros(self.shape, dtype=self.dtype,
-                                     order=self.default_order))
-
-    def ones(self):
-        """Return a tensor of all ones.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)
-        >>> x = space.one()
-        >>> x
-        rn(3).element([ 1.,  1.,  1.])
-        """
-        return self.element(np.ones(self.shape, dtype=self.dtype,
-                                    order=self.default_order))
-
-    @staticmethod
-    def available_dtypes():
-        """Return the set of data types available in this implementation.
-
-        Notes
-        -----
-        This is all dtypes available in Numpy. See ``numpy.sctypeDict``
-        for more information.
-
-        The available dtypes may depend on the specific system used.
-        """
-        all_dtypes = []
-        for dtype in np.sctypeDict.values():
-            if dtype not in (object, np.void):
-                all_dtypes.append(np.dtype(dtype))
-        # Need to add these manually since they are not contained
-        # in np.sctypeDict.
-        all_dtypes.extend([np.dtype('S'), np.dtype('U')])
-        return tuple(sorted(set(all_dtypes)))
+    @property
+    def tensor_type(self):
+        """Exponent of the norm and the distance."""
+        return NumpyTensor
 
     @staticmethod
     def default_dtype(field=None):
@@ -553,14 +407,14 @@ class NumpyTensorSpace(TensorSpace):
         dtype : `numpy.dtype`
             Numpy data type specifier. The returned defaults are:
 
-                ``RealNumbers()`` : ``np.dtype('float64')``
+                ``RealNumbers()`` : ``np.dtype('float32')``
 
-                ``ComplexNumbers()`` : ``np.dtype('complex128')``
+                ``ComplexNumbers()`` : ``np.dtype('complex64')``
         """
         if field is None or field == RealNumbers():
-            return np.dtype('float64')
+            return np.float32
         elif field == ComplexNumbers():
-            return np.dtype('complex128')
+            return np.complex64
         else:
             raise ValueError('no default data type defined for field {}'
                              ''.format(field))
@@ -918,6 +772,12 @@ class NumpyTensorSpace(TensorSpace):
         numpy arrays.
         """
         return self.dtype.type(s)
+    
+    @property
+    def np_dtype(self):
+        """Equivalent numpy type of space.type
+        """
+        return self.dtype
 
 
 class NumpyTensor(Tensor):
@@ -954,7 +814,7 @@ class NumpyTensor(Tensor):
             Array in which the result should be written in-place.
             Has to be contiguous and of the correct dtype.
         display : `bool`, default is False
-            keyword to indicate if the extraction is for display. 
+            keyword to indicate if the extraction is for display.
 
         Returns
         -------
