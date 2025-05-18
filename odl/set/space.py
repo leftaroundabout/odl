@@ -102,7 +102,7 @@ class LinearSpace(Set):
         yield ('Zero', self.zero())
 
         try:
-            yield ('One', self.one())
+            yield ('One', self.ones())
         except NotImplementedError:
             pass
 
@@ -162,7 +162,7 @@ class LinearSpace(Set):
         raise LinearSpaceNotImplementedError(
             'multiplication not implemented in space {!r}'.format(self))
 
-    def one(self):
+    def ones(self):
         """Return the one (multiplicative unit) element of this space."""
         raise LinearSpaceNotImplementedError(
             '`one` element not implemented in space {!r}'.format(self))
@@ -622,13 +622,13 @@ class LinearSpaceElement(object):
             raise TypeError('cannot add {!r} and {!r} in-place'
                             ''.format(self, other))
         elif other in self.space.field:
-            one = getattr(self.space, 'one', None)
-            if one is None:
+            ones = getattr(self.space, 'ones', None)
+            if ones is None:
                 raise TypeError('cannot add {!r} and {!r} in-place'
                                 ''.format(self, other))
             else:
-                # other --> other * space.one()
-                return self.space.lincomb(1, self, other, one(), out=self)
+                # other --> other * space.ones()
+                return self.space.lincomb(1, self, other, ones(), out=self)
         else:
             try:
                 other = self.space.element(other)
@@ -650,11 +650,11 @@ class LinearSpaceElement(object):
         elif isinstance(other, LinearSpaceElement):
             return NotImplemented
         elif other in self.space.field:
-            one = getattr(self.space, 'one', None)
-            if one is None:
+            ones = getattr(self.space, 'one', None)
+            if ones is None:
                 return NotImplemented
             else:
-                tmp = one()
+                tmp = ones()
                 return self.space.lincomb(1, self, other, tmp, out=tmp)
         else:
             try:
@@ -686,12 +686,12 @@ class LinearSpaceElement(object):
         elif self.space.field is None:
             return NotImplemented
         elif other in self.space.field:
-            one = getattr(self.space, 'one', None)
-            if one is None:
+            ones = getattr(self.space, 'ones', None)
+            if ones is None:
                 raise TypeError('cannot subtract {!r} and {!r} in-place'
                                 ''.format(self, other))
             else:
-                return self.space.lincomb(1, self, -other, one(), out=self)
+                return self.space.lincomb(1, self, -other, ones(), out=self)
         else:
             try:
                 other = self.space.element(other)
@@ -713,11 +713,11 @@ class LinearSpaceElement(object):
         elif isinstance(other, LinearSpaceElement):
             return NotImplemented
         elif other in self.space.field:
-            one = getattr(self.space, 'one', None)
-            if one is None:
+            ones = getattr(self.space, 'ones', None)
+            if ones is None:
                 return NotImplemented
             else:
-                tmp = one()
+                tmp = ones()
                 return self.space.lincomb(1, self, -other, tmp, out=tmp)
         else:
             try:
@@ -739,12 +739,12 @@ class LinearSpaceElement(object):
         elif isinstance(other, LinearSpaceElement):
             return NotImplemented
         elif other in self.space.field:
-            one = getattr(self.space, 'one', None)
-            if one is None:
+            ones = getattr(self.space, 'ones', None)
+            if ones is None:
                 return NotImplemented
             else:
-                # other --> other * space.one()
-                tmp = one()
+                # other --> other * space.ones()
+                tmp = ones()
                 self.space.lincomb(other, tmp, out=tmp)
                 return self.space.lincomb(1, tmp, -1, self, out=tmp)
         else:
@@ -860,12 +860,12 @@ class LinearSpaceElement(object):
         elif self.space.field is None:
             return NotImplemented
         elif other in self.space.field:
-            one = getattr(self.space, 'one', None)
-            if one is None:
+            ones = getattr(self.space, 'ones', None)
+            if ones is None:
                 return NotImplemented
             else:
-                # other --> other * space.one()
-                tmp = one()
+                # other --> other * space.ones()
+                tmp = ones()
                 self.space.lincomb(other, tmp, out=tmp)
                 return self.space.divide(tmp, self, out=tmp)
         elif other in self.space:
@@ -894,10 +894,10 @@ class LinearSpaceElement(object):
             raise ValueError('expected integer `p`, got {}'.format(p_in))
         if p < 0:
             self **= -p
-            self.space.divide(self.space.one(), self, out=self)
+            self.space.divide(self.space.ones(), self, out=self)
             return self
         elif p == 0:
-            self.assign(self.space.one())
+            self.assign(self.space.ones())
             return self
         elif p == 1:
             return self
