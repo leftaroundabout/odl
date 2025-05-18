@@ -9,40 +9,57 @@
 """PyTorch implementation of tensor spaces."""
 
 from __future__ import absolute_import, division, print_function
-from future.utils import native
 
-import ctypes
 from builtins import object
-from functools import partial
 
 import numpy as np
 import torch
 
 from odl.set.sets import ComplexNumbers, RealNumbers
-from odl.set.space import (LinearSpaceTypeError,
-        NumOperationParadigmSupport, SupportedNumOperationParadigms)
+from odl.set.space import (
+    LinearSpaceTypeError,
+    NumOperationParadigmSupport,
+    SupportedNumOperationParadigms,
+)
 from odl.space.base_tensors import Tensor, TensorSpace
 from odl.space.weighting import (
-    ArrayWeighting, ConstWeighting, CustomDist, CustomInner, CustomNorm,
-    Weighting)
-from odl.util.utility import ArrayOnPytorchManager, _CORRESPONDING_PYTORCH_DTYPES
+    ArrayWeighting,
+    ConstWeighting,
+    CustomDist,
+    CustomInner,
+    CustomNorm,
+    Weighting,
+)
+
 from odl.util import (
-    dtype_str, is_floating_dtype, is_numeric_dtype, is_real_dtype, nullcontext,
-    signature_string, writable_array)
+    dtype_str,
+    is_numeric_dtype,
+    is_real_dtype,
+    signature_string,
+)
 
 
 import array_api_compat.torch as xp
 
-__all__ = ('PytorchTensorSpace',)
+__all__ = ("PytorchTensorSpace", "TORCH_DTYPES")
 
-
-# Define size thresholds to switch implementations
-THRESHOLD_SMALL = 100
-THRESHOLD_MEDIUM = 50000
-
+TORCH_DTYPES = {
+        "bool": torch.bool,
+        "int8": torch.int8,
+        "int16": torch.int16,
+        "int32": torch.int32,
+        "int64": torch.int64,
+        "uint8": torch.uint8,
+        "uint16": torch.uint16,
+        "uint32": torch.uint32,
+        "uint64": torch.uint64,
+        "float32": torch.float32,
+        "float64": torch.float64,
+        "complex64": torch.complex64,
+        "complex128": torch.complex128,
+    }
 
 class PytorchTensorSpace(TensorSpace):
-
     """Set of tensors of arbitrary data type, implemented with Pytorch.
 
     A tensor is, in the most general sense, a multi-dimensional array
@@ -77,7 +94,7 @@ class PytorchTensorSpace(TensorSpace):
     .. _Wikipedia article on tensors: https://en.wikipedia.org/wiki/Tensor
     """
 
-    def __init__(self, shape, dtype=None, device='cpu',**kwargs):
+    def __init__(self, shape, dtype='float32', device="cpu", **kwargs):
         r"""Initialize a new instance.
 
         Parameters
@@ -92,8 +109,11 @@ class PytorchTensorSpace(TensorSpace):
             the `default_dtype` of this space (``float64``) is used.
         device : PyTorch device identifier
             Where to store and process data (i.e. arrays) representing elements
-            of this space. Should typically be a GPU (cuda) if available, else
-            CPU as also used by NumPy.
+            of this space. Should typically be a 'cuda:i' (cuda) if available, else
+            'cpu' as also used by NumPy.
+
+        Other Parameters
+        ----------------
         exponent : positive float, optional
             Exponent of the norm. For values other than 2.0, no
             inner product is defined.
@@ -102,25 +122,6 @@ class PytorchTensorSpace(TensorSpace):
             ``inner`` is given, or if ``dtype`` is non-numeric.
 
             Default: 2.0
-
-        Other Parameters
-        ----------------
-        weighting : optional
-            Use weighted inner product, norm, and dist. The following
-            types are supported as ``weighting``:
-
-            ``None``: no weighting, i.e. weighting with ``1.0`` (default).
-
-            `Weighting`: Use this weighting as-is. Compatibility
-            with this space's elements is not checked during init.
-
-            ``float``: Weighting by a constant.
-
-            array-like: Pointwise weighting by an array.
-
-            This option cannot be combined with ``dist``,
-            ``norm`` or ``inner``. It also cannot be used in case of
-            non-numeric ``dtype``.
 
         dist : callable, optional
             Distance function defining a metric on the space.
@@ -155,14 +156,29 @@ class PytorchTensorSpace(TensorSpace):
             ``dist`` or ``norm``. It also cannot be used in case of
             non-numeric ``dtype``.
 
+        weighting : optional
+            Use weighted inner product, norm, and dist. The following
+            types are supported as ``weighting``:
+
+            ``None``: no weighting, i.e. weighting with ``1.0`` (default).
+
+            `Weighting`: Use this weighting as-is. Compatibility
+            with this space's elements is not checked during init.
+
+            ``float``: Weighting by a constant.
+
+            array-like: Pointwise weighting by an array.
+
+            This option cannot be combined with ``dist``,
+            ``norm`` or ``inner``. It also cannot be used in case of
+            non-numeric ``dtype``.
+
         kwargs :
             Further keyword arguments are passed to the weighting
             classes.
 
         See Also
         --------
-        odl.space.space_utils.rn : constructor for real tensor spaces
-        odl.space.space_utils.cn : constructor for complex tensor spaces
         odl.space.space_utils.tensor_space :
             constructor for tensor spaces of arbitrary scalar data type
 
@@ -208,54 +224,94 @@ class PytorchTensorSpace(TensorSpace):
         --------
         Explicit initialization with the class constructor:
 
-        >>> space = PytorchTensorSpace(3, float)
+        >>> space = PytorchTensorSpace(3)
         >>> space
         rn(3)
         >>> space.shape
         (3,)
         >>> space.dtype
-        dtype('float64')
+        dtype('float32')
         """
         super(PytorchTensorSpace, self).__init__(shape, dtype, device)
-        if self.dtype not in self.available_dtypes():
-            raise ValueError('`dtype` {!r} not supported'
-                             ''.format(dtype_str(dtype)))
 
-        dist = kwargs.pop('dist', None)
-        norm = kwargs.pop('norm', None)
-        inner = kwargs.pop('inner', None)
-        weighting = kwargs.pop('weighting', None)
-        exponent = kwargs.pop('exponent', getattr(weighting, 'exponent', 2.0))
+        # Dtype check and parsing 
+        self.parse_dtype(dtype)
 
-        self._device = torch.device(device)
+        # Device check and parsing
+        self.parse_device(device)
 
-        if (not is_numeric_dtype(self.dtype) and
-                any(x is not None for x in (dist, norm, inner, weighting))):
-            raise ValueError('cannot use any of `weighting`, `dist`, `norm` '
-                             'or `inner` for non-numeric `dtype` {}'
-                             ''.format(dtype))
-        else:
-            self._torch_dtype = _CORRESPONDING_PYTORCH_DTYPES[self.dtype]
+        # Weighting Check and parsing
+        self.kwargs = self.parse_weighting(kwargs)
+
+        # In-place ops check
+        self._use_in_place_ops = kwargs.pop("use_in_place_ops", True)
+
+        # Make sure there are no leftover kwargs
+        if kwargs:
+            raise TypeError("got unknown keyword arguments {}".format(kwargs))
+
+    ################ Init Methods, Non static ################
+    def parse_dtype(self, dtype:str):
+        """
+        Process the dtype argument. This parses the (str) dtype input argument to a torch.dtype and sets two attributes
+
+        self.dtype_as_str (str)    -> Used for passing dtype information from one backend to another
+        self.__dtype (torch.dtype) -> Actual dtype of the TensorSpace implementation
+
+        Note:
+        The check below is here just in case a user initialise a space directly from this class, which is not recommended
+        """
+        if dtype not in TORCH_DTYPES:
+            raise ValueError("`dtype` {!r} not supported" "".format(dtype_str(dtype)))
+
+        self.__dtype_as_str = dtype
+        self.__dtype = TORCH_DTYPES[dtype]
+
+    def parse_device(self, device):
+        """
+        Process the device argument 
+        This checks that the device requested is available and sets one attribute
+        self.__device (torch.device) -> The device on which the TensorSpace lives
+        """
+        if device != 'cpu':
+            assert torch.cuda.is_available(), "CUDA is not available, please provide device='cpu'"
+            devices_list = [f'cuda:{i}' for i in range(torch.cuda.device_count())]
+            assert device in devices_list, f"Wrong device specification, must be in {devices_list}, but {device} was provided"
+        
+        self.__device = torch.device(device)
+    
+    def parse_weighting(self, kwargs):
+        dist = kwargs.pop("dist", None)
+        norm = kwargs.pop("norm", None)
+        inner = kwargs.pop("inner", None)
+        weighting = kwargs.pop("weighting", None)
+        exponent = kwargs.pop("exponent", getattr(weighting, "exponent", 2.0))
+
         if exponent != 2.0 and any(x is not None for x in (dist, norm, inner)):
-            raise ValueError('cannot use any of `dist`, `norm` or `inner` '
-                             'for exponent != 2')
+            raise ValueError(
+                "cannot use any of `dist`, `norm` or `inner` " "for exponent != 2"
+            )
         # Check validity of option combination (0 or 1 may be provided)
-        num_extra_args = sum(a is not None
-                             for a in (dist, norm, inner, weighting))
+        num_extra_args = sum(a is not None for a in (dist, norm, inner, weighting))
         if num_extra_args > 1:
-            raise ValueError('invalid combination of options `weighting`, '
-                             '`dist`, `norm` and `inner`')
-
-        # Set the weighting
+            raise ValueError(
+                "invalid combination of options `weighting`, "
+                "`dist`, `norm` and `inner`"
+            )
+        
         if weighting is not None:
             if isinstance(weighting, Weighting):
-                if weighting.impl != 'pytorch':
-                    raise ValueError("`weighting.impl` must be 'pytorch', "
-                                     '`got {!r}'.format(weighting.impl))
+                if weighting.impl != "pytorch":
+                    raise ValueError(
+                        "`weighting.impl` must be 'pytorch', "
+                        "`got {!r}".format(weighting.impl)
+                    )
                 if weighting.exponent != exponent:
-                    raise ValueError('`weighting.exponent` conflicts with '
-                                     '`exponent`: {} != {}'
-                                     ''.format(weighting.exponent, exponent))
+                    raise ValueError(
+                        "`weighting.exponent` conflicts with "
+                        "`exponent`: {} != {}"
+                        "".format(weighting.exponent, exponent)
+                    )
                 self.__weighting = weighting
             else:
                 self.__weighting = _weighting(weighting, exponent)
@@ -263,19 +319,24 @@ class PytorchTensorSpace(TensorSpace):
             # Check (afterwards) that the weighting input was sane
             if isinstance(self.weighting, PytorchTensorSpaceArrayWeighting):
                 if self.weighting.array.dtype == object:
-                    raise ValueError('invalid `weighting` argument: {}'
-                                     ''.format(weighting))
-                elif not np.can_cast(self.weighting.array.dtype, self.dtype):
                     raise ValueError(
-                        'cannot cast from `weighting` data type {} to '
-                        'the space `dtype` {}'
-                        ''.format(dtype_str(self.weighting.array.dtype),
-                                  dtype_str(self.dtype)))
+                        "invalid `weighting` argument: {}" "".format(weighting)
+                    )
+
+                elif not torch.can_cast(self.weighting.array.dtype, self.dtype):
+                    raise ValueError(
+                        "cannot cast from `weighting` data type {} to "
+                        "the space `dtype` {}"
+                        "".format(
+                            dtype_str(self.weighting.array.dtype), dtype_str(self.dtype)
+                        )
+                    )
                 if self.weighting.array.shape != self.shape:
-                    raise ValueError('array-like weights must have same '
-                                     'shape {} as this space, got {}'
-                                     ''.format(self.shape,
-                                               self.weighting.array.shape))
+                    raise ValueError(
+                        "array-like weights must have same "
+                        "shape {} as this space, got {}"
+                        "".format(self.shape, self.weighting.array.shape)
+                    )
 
         elif dist is not None:
             self.__weighting = PytorchTensorSpaceCustomDist(dist)
@@ -287,17 +348,14 @@ class PytorchTensorSpace(TensorSpace):
             # No weighting, i.e., weighting with constant 1.0
             self.__weighting = PytorchTensorSpaceConstWeighting(1.0, exponent)
 
-        self._use_in_place_ops = kwargs.pop('use_in_place_ops', True)
+        return kwargs
 
-        # Make sure there are no leftover kwargs
-        if kwargs:
-            raise TypeError('got unknown keyword arguments {}'.format(kwargs))
-        
+    ################ Properties ################
     @property
     def array_namespace(self):
         """Name of the array_namespace"""
         return xp
-    
+
     @property
     def array_type(self):
         """Name of the array_type of this tensor set.
@@ -306,10 +364,110 @@ class PytorchTensorSpace(TensorSpace):
         return torch.Tensor
     
     @property
+    def byaxis(self):
+        """Return the subspace defined along one or several dimensions.
+
+        Examples
+        --------
+        Indexing with integers or slices:
+
+        >>> space = odl.rn((2, 3, 4))  # TODO adapt
+        >>> space.byaxis[0]
+        rn(2)
+        >>> space.byaxis[1:]
+        rn((3, 4))
+
+        Lists can be used to stack spaces arbitrarily:
+
+        >>> space.byaxis[[2, 1, 2]]
+        rn((4, 3, 4))
+        """
+        space = self
+
+        class PytorchTensorSpacebyaxis(object):
+            """Helper class for indexing by axis."""
+
+            def __getitem__(self, indices):
+                """Return ``self[indices]``."""
+                try:
+                    iter(indices)
+                except TypeError:
+                    newshape = space.shape[indices]
+                else:
+                    newshape = tuple(space.shape[i] for i in indices)
+
+                if isinstance(space.weighting, ArrayWeighting):
+                    new_array = np.asarray(space.weighting.array[indices])
+                    weighting = PytorchTensorSpaceArrayWeighting(
+                        new_array, space.weighting.exponent
+                    )
+                else:
+                    weighting = space.weighting
+
+                return type(space)(newshape, space.dtype, weighting=weighting)
+
+            def __repr__(self):
+                """Return ``repr(self)``."""
+                return repr(space) + ".byaxis"
+
+        return PytorchTensorSpacebyaxis()
+    
+    @property
+    def data_ptr(self):
+        """A raw pointer to the data container of ``self``.
+
+        Examples
+        --------
+        >>> import ctypes
+        >>> space = odl.tensor_space(3, dtype='uint16')   # TODO check example
+        >>> x = space.element([1, 2, 3])
+        >>> arr_type = ctypes.c_uint16 * 3  # C type "array of 3 uint16"
+        >>> buffer = arr_type.from_address(x.data_ptr)
+        >>> arr = np.frombuffer(buffer, dtype='uint16')
+        >>> arr
+        array([1, 2, 3], dtype=uint16)
+
+        In-place modification via pointer:
+
+        >>> arr[0] = 42    # TODO doubtful if this actually works
+        >>> x
+        tensor_space(3, dtype='uint16').element([42,  2,  3])
+        """
+        return self.data.data_ptr()
+    
+    @property
+    def device(self):
+        """Scalar data type of each entry in an element of this space."""
+        return self.__device
+    
+    @property
+    def dtype(self):
+        """Scalar data type of each entry in an element of this space."""
+        return self.__dtype
+    
+    @property
+    def dtype_as_str(self):
+        """Scalar data type of each entry in an element of this space as a string."""
+        return self.__dtype_as_str
+    
+    @property
+    def exponent(self):
+        """Exponent of the norm and the distance."""
+        return self.weighting.exponent
+
+    @property
     def impl(self):
         """Name of the implementation back-end: ``'pytorch'``."""
-        return 'pytorch'
-
+        return "pytorch"
+    
+    @property
+    def is_weighted(self):
+        """Return ``True`` if the space is not weighted by constant 1.0."""
+        return not (
+            isinstance(self.weighting, PytorchTensorSpaceConstWeighting)
+            and self.weighting.const == 1.0
+        )
+    
     @property
     def supported_num_operation_paradigms(self) -> NumOperationParadigmSupport:
         """PyTorch supports both in-place and out of place operations, but the
@@ -319,20 +477,27 @@ class PytorchTensorSpace(TensorSpace):
         out-of-place style."""
         if self._use_in_place_ops:
             return SupportedNumOperationParadigms(
-                    in_place = NumOperationParadigmSupport.SUPPORTED,
-                    out_of_place = NumOperationParadigmSupport.PREFERRED)
+                in_place=NumOperationParadigmSupport.SUPPORTED,
+                out_of_place=NumOperationParadigmSupport.PREFERRED,
+            )
         else:
             return SupportedNumOperationParadigms(
-                    in_place = NumOperationParadigmSupport.NOT_SUPPORTED,
-                    out_of_place = NumOperationParadigmSupport.PREFERRED)
+                in_place=NumOperationParadigmSupport.NOT_SUPPORTED,
+                out_of_place=NumOperationParadigmSupport.PREFERRED,
+            )
 
     @property
-    def default_order(self):
-        """Default (and only) storage order for new elements in this space: ``'C'``."""
-        return 'C'
+    def tensor_type(self):
+        return PytorchTensor
+    
+    @property
+    def weighting(self):
+        """This space's weighting scheme."""
+        return self.__weighting   
 
+    @staticmethod
     def is_suitable_scalar(self, s):
-        if self._torch_dtype in [torch.complex64, torch.complex128]:
+        if self.dtype in [torch.complex64, torch.complex128]:
             return type(s) is complex
         else:
             return type(s) is float
@@ -346,11 +511,12 @@ class PytorchTensorSpace(TensorSpace):
         # else:
         #     return True
 
+    ################ Methods (Non-static) ################
     def as_suitable_scalar(self, s):
         """Try to convert `s` to a type that can be scalar-multiplied with
         torch tensors.
         """
-        if self._torch_dtype in [torch.complex64, torch.complex128]:
+        if self.dtype in [torch.complex64, torch.complex128]:
             return complex(s)
             # Arguably, this would be more appropriate:
             # return torch.tensor(complex(s), dtype=self._torch_dtype)
@@ -360,171 +526,31 @@ class PytorchTensorSpace(TensorSpace):
             return float(s)
             # return torch.tensor(float(s), dtype=self._torch_dtype)
 
-    @property
-    def weighting(self):
-        """This space's weighting scheme."""
-        return self.__weighting
-
-    @property
-    def is_weighted(self):
-        """Return ``True`` if the space is not weighted by constant 1.0."""
-        return not (
-            isinstance(self.weighting, PytorchTensorSpaceConstWeighting) and
-            self.weighting.const == 1.0)
-
-    @property
-    def exponent(self):
-        """Exponent of the norm and the distance."""
-        return self.weighting.exponent
-
-    def element(self, inp=None, data_ptr=None, order=None):
-        """Create a new element.
+    def copy(self):
+        """Return an identical (deep) copy of this tensor.
 
         Parameters
         ----------
-        inp : `array-like`, optional
-            Input used to initialize the new element.
-
-            If ``inp`` is `None`, an empty element is created with no
-            guarantee of its state (memory allocation only).
-            All tensors use row-major storage (corrsponding to
-            `order='C'` in NumPy).
-
-            Otherwise, a copy is avoided whenever possible. This requires
-            correct `shape` and `dtype`, and if ``order`` is provided,
-            also contiguousness in that ordering. If any of these
-            conditions is not met, a copy is made.
-
-        data_ptr : int, optional
-            Pointer to the start memory address of a contiguous PyTorch array
-            or an equivalent raw container with the same total number of
-            bytes.
-            The option is also mutually exclusive with ``inp``.
+        None
 
         Returns
         -------
-        element : `PytorchTensor`
-            The new element, created from ``inp`` or from scratch.
+        copy : `PytorchTensor`
+            The deep copy
 
         Examples
         --------
-        Without arguments, an uninitialized element is created. With an
-        array-like input, the element can be initialized:
-
-        >>> space = odl.rn(3)           # TODO adapt / test
-        >>> empty = space.element()
-        >>> empty.shape
-        (3,)
-        >>> empty.space
-        rn(3)
+        >>> space = odl.rn(3)   # TODO adapt
         >>> x = space.element([1, 2, 3])
-        >>> x
-        rn(3).element([ 1.,  2.,  3.])
-
-        If the input already is a `torch.Tensor` of correct `dtype`, it
-        will merely be wrapped, i.e., both array and space element access
-        the same memory, such that mutations will affect both:
-
-        >>> arr = torch.Tensor([1, 2, 3], dtype=float)  # TODO test
-        >>> elem = odl.rn(3).element(arr)
-        >>> elem[0] = 0
-        >>> elem
-        rn(3).element([ 0.,  2.,  3.])
-        >>> arr
-        array([ 0.,  2.,  3.])
-
-        Elements can also be constructed from a data pointer, resulting
-        again in shared memory:
-
-        >>> int_space = odl.tensor_space((2, 3), dtype=int)
-        >>> arr = torch.Tensor([[1, 2, 3],
-        ...                     [4, 5, 6]], dtype=int, order='F')
-        >>> ptr = arr.ctypes.data
-        >>> y = int_space.element(data_ptr=ptr, order='F')
-        >>> y
-        tensor_space((2, 3), dtype=int).element(
-            [[1, 2, 3],
-             [4, 5, 6]]
-        )
-        >>> y[0, 1] = -1
-        >>> arr
-        array([[ 1, -1,  3],
-               [ 4,  5,  6]])
+        >>> y = x.copy()
+        >>> y == x
+        True
+        >>> y is x
+        False
         """
-        if order is not None and str(order).upper() not in ('C'):
-            raise ValueError(f"Only row-major order supported ('C'), not '{order}'.")
+        return self.space.element(self.data.clone())
 
-        def wrapped_array(arr):
-            if arr.shape != self.shape:
-                raise ValueError('shape of `inp` not equal to space shape: '
-                                 '{} != {}'.format(arr.shape, self.shape))
-            return self.element_type(self, arr)
-
-        if inp is None and data_ptr is None:
-            return wrapped_array(torch.empty(
-               self.shape, dtype=self._torch_dtype, device=self._device))
-
-        elif inp is None and data_ptr is not None:
-            if order is None:
-                raise ValueError('`order` cannot be None for element '
-                                 'creation from pointer')
-
-            ctype_array_def = ctypes.c_byte * self.nbytes
-            as_ctype_array = ctype_array_def.from_address(data_ptr)
-            as_numpy_array = np.ctypeslib.as_array(as_ctype_array)
-            arr = as_numpy_array.view(dtype=self._torch_dtype)
-            arr = arr.reshape(self.shape, order=order)
-            return wrapped_array(torch.tensor(
-                 arr, dtype=self._torch_dtype, device=self._device))
-
-        elif inp is not None and data_ptr is None:
-            if inp in self and order is None:
-                # Short-circuit for space elements and no enforced ordering
-                return inp
-
-            # TODO avoid copy when it's not necessary
-            return wrapped_array(ArrayOnPytorchManager(device=self._device)
-                                  .as_compatible_array(inp, dtype=self._torch_dtype))
-
-        else:
-            raise TypeError('cannot provide both `inp` and `data_ptr`')
-
-    def zeros(self):
-        """Return a tensor of all zeros.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)  # TODO adapt
-        >>> x = space.zero()
-        >>> x
-        rn(3).element([ 0.,  0.,  0.])
-        """
-        return self.element(torch.zeros(self.shape, dtype=self._torch_dtype))
-
-    def ones(self):
-        """Return a tensor of all ones.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)  # TODO adapt
-        >>> x = space.one()
-        >>> x
-        rn(3).element([ 1.,  1.,  1.])
-        """
-        return self.element(torch.ones(self.shape, dtype=self._torch_dtype))
-
-    @staticmethod
-    def available_dtypes():
-        """Return the set of data types available in this implementation.
-
-        Notes
-        -----
-        Currently only a conservative selection of the types supported
-        by Pytorch.
-        """
-        return [np.float16, np.float32, np.float64,
-                np.complex64, np.complex128]
-
+    ################ Methods (static) ################
     @staticmethod
     def default_dtype(field=None):
         """Return the default data type of this class for a given field.
@@ -541,57 +567,23 @@ class PytorchTensorSpace(TensorSpace):
         dtype : `torch.dtype`
             Pytorch data type specifier. The returned defaults are:
 
-                ``RealNumbers()`` : ``np.dtype('float64')``
+                ``RealNumbers()`` : ``torch.dtype('float32')``
 
-                ``ComplexNumbers()`` : ``np.dtype('complex128')``
+                ``ComplexNumbers()`` : ``torch.dtype('complex64')``
         """
         # Note that we're using the NumPy versions of the types, rather
         # than the equivalent Pytorch ones. This is for compatibility
         # with the rest of ODL, which is not aware of Pytorch.
         if field is None or field == RealNumbers():
-            return np.float64
+            return torch.float32
         elif field == ComplexNumbers():
-            return np.complex128
+            return torch.complex64
         else:
-            raise ValueError('no default data type defined for field {}'
-                             ''.format(field))
+            raise ValueError(
+                "no default data type defined for field {}" "".format(field)
+            )
 
-    def _lincomb(self, a, x1, b, x2, out):
-        """Implement the linear combination of ``x1`` and ``x2``.
-
-        Compute ``out = a*x1 + b*x2`` using optimized
-        BLAS routines if possible.
-
-        This function is part of the subclassing API. Do not
-        call it directly.
-
-        Parameters
-        ----------
-        a, b : `TensorSpace.field` element
-            Scalars to multiply ``x1`` and ``x2`` with.
-        x1, x2 : `PytorchTensor`
-            Summands in the linear combination.
-        out : `PytorchTensor`
-            Tensor to which the result is written.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)    # TODO adapt
-        >>> x = space.element([0, 1, 1])
-        >>> y = space.element([0, 0, 1])
-        >>> out = space.element()
-        >>> result = space.lincomb(1, x, 2, y, out)
-        >>> result
-        rn(3).element([ 0.,  1.,  3.])
-        >>> result is out
-        True
-        """
-        if self._use_in_place_ops and out is not None:
-            torch.add(input=a*x1.data, other=x2.data, alpha=b, out=out.data)
-        else:
-            assert(out is None)
-            return self.element(a * x1.data + b * x2.data)
-
+    ################ Methods (Subclassing API)  ################
     def _dist(self, x1, x2):
         """Return the distance between ``x1`` and ``x2``.
 
@@ -633,6 +625,134 @@ class PytorchTensorSpace(TensorSpace):
         7.0
         """
         return self.weighting.dist(x1, x2)
+    
+    def _divide(self, x1, x2, out):
+        """Compute the entry-wise quotient ``x1 / x2``.
+
+        This function is part of the subclassing API. Do not
+        call it directly.
+
+        Parameters
+        ----------
+        x1, x2 : `PytorchTensor`
+            Dividend and divisor in the quotient.
+        out : `PytorchTensor`
+            Element to which the result is written.
+
+        Examples
+        --------
+        >>> space = odl.rn(3)
+        >>> x = space.element([2, 0, 4])
+        >>> y = space.element([1, 1, 2])
+        >>> space.divide(x, y)
+        rn(3).element([ 2.,  0.,  2.])
+        >>> out = space.element()
+        >>> result = space.divide(x, y, out=out)
+        >>> result
+        rn(3).element([ 2.,  0.,  2.])
+        >>> result is out
+        True
+        """
+        torch.div(x1.data, x2.data, out=out.data)
+    
+    def _inner(self, x1, x2):
+        """Return the inner product of ``x1`` and ``x2``.
+
+        This function is part of the subclassing API. Do not
+        call it directly.
+
+        Parameters
+        ----------
+        x1, x2 : `PytorchTensor`
+            Elements whose inner product is calculated.
+
+        Returns
+        -------
+        inner : `field` `element`
+            Inner product of the elements.
+
+        Examples
+        --------
+        >>> space = odl.rn(3)
+        >>> x = space.element([1, 0, 3])
+        >>> y = space.one()
+        >>> space.inner(x, y)
+        4.0
+
+        Weighting is supported, too:
+
+        >>> space_w = odl.rn(3, weighting=[2, 1, 1])
+        >>> x = space_w.element([1, 0, 3])
+        >>> y = space_w.one()
+        >>> space_w.inner(x, y)
+        5.0
+        """
+        return self.weighting.inner(x1, x2)
+    
+    def _lincomb(self, a, x1, b, x2, out):
+        """Implement the linear combination of ``x1`` and ``x2``.
+
+        Compute ``out = a*x1 + b*x2`` using optimized
+        BLAS routines if possible.
+
+        This function is part of the subclassing API. Do not
+        call it directly.
+
+        Parameters
+        ----------
+        a, b : `TensorSpace.field` element
+            Scalars to multiply ``x1`` and ``x2`` with.
+        x1, x2 : `PytorchTensor`
+            Summands in the linear combination.
+        out : `PytorchTensor`
+            Tensor to which the result is written.
+
+        Examples
+        --------
+        >>> space = odl.rn(3)    # TODO adapt
+        >>> x = space.element([0, 1, 1])
+        >>> y = space.element([0, 0, 1])
+        >>> out = space.element()
+        >>> result = space.lincomb(1, x, 2, y, out)
+        >>> result
+        rn(3).element([ 0.,  1.,  3.])
+        >>> result is out
+        True
+        """
+        if self._use_in_place_ops and out is not None:
+            torch.add(input=a * x1.data, other=x2.data, alpha=b, out=out.data)
+        else:
+            assert out is None
+            return self.element(a * x1.data + b * x2.data)
+
+    def _multiply(self, x1, x2, out):
+        """Compute the entry-wise product ``out = x1 * x2``.
+
+        This function is part of the subclassing API. Do not
+        call it directly.
+
+        Parameters
+        ----------
+        x1, x2 : `PytorchTensor`
+            Factors in the product.
+        out : `PytorchTensor`
+            Element to which the result is written.
+
+        Examples
+        --------
+        >>> space = odl.rn(3)
+        >>> x = space.element([1, 0, 3])
+        >>> y = space.element([-1, 1, -1])
+        >>> space.multiply(x, y)
+        rn(3).element([-1.,  0., -3.])
+        >>> out = space.element()
+        >>> result = space.multiply(x, y, out=out)
+        >>> result
+        rn(3).element([-1.,  0., -3.])
+        >>> result is out
+        True
+        """
+        torch.mul(x1.data, x2.data, out=out.data)
 
     def _norm(self, x):
         """Return the norm of ``x``.
@@ -672,98 +792,8 @@ class PytorchTensorSpace(TensorSpace):
         """
         return self.weighting.norm(x)
 
-    def _inner(self, x1, x2):
-        """Return the inner product of ``x1`` and ``x2``.
-
-        This function is part of the subclassing API. Do not
-        call it directly.
-
-        Parameters
-        ----------
-        x1, x2 : `PytorchTensor`
-            Elements whose inner product is calculated.
-
-        Returns
-        -------
-        inner : `field` `element`
-            Inner product of the elements.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)
-        >>> x = space.element([1, 0, 3])
-        >>> y = space.one()
-        >>> space.inner(x, y)
-        4.0
-
-        Weighting is supported, too:
-
-        >>> space_w = odl.rn(3, weighting=[2, 1, 1])
-        >>> x = space_w.element([1, 0, 3])
-        >>> y = space_w.one()
-        >>> space_w.inner(x, y)
-        5.0
-        """
-        return self.weighting.inner(x1, x2)
-
-    def _multiply(self, x1, x2, out):
-        """Compute the entry-wise product ``out = x1 * x2``.
-
-        This function is part of the subclassing API. Do not
-        call it directly.
-
-        Parameters
-        ----------
-        x1, x2 : `PytorchTensor`
-            Factors in the product.
-        out : `PytorchTensor`
-            Element to which the result is written.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)
-        >>> x = space.element([1, 0, 3])
-        >>> y = space.element([-1, 1, -1])
-        >>> space.multiply(x, y)
-        rn(3).element([-1.,  0., -3.])
-        >>> out = space.element()
-        >>> result = space.multiply(x, y, out=out)
-        >>> result
-        rn(3).element([-1.,  0., -3.])
-        >>> result is out
-        True
-        """
-        torch.mul(x1.data, x2.data, out=out.data)
-
-    def _divide(self, x1, x2, out):
-        """Compute the entry-wise quotient ``x1 / x2``.
-
-        This function is part of the subclassing API. Do not
-        call it directly.
-
-        Parameters
-        ----------
-        x1, x2 : `PytorchTensor`
-            Dividend and divisor in the quotient.
-        out : `PytorchTensor`
-            Element to which the result is written.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)
-        >>> x = space.element([2, 0, 4])
-        >>> y = space.element([1, 1, 2])
-        >>> space.divide(x, y)
-        rn(3).element([ 2.,  0.,  2.])
-        >>> out = space.element()
-        >>> result = space.divide(x, y, out=out)
-        >>> result
-        rn(3).element([ 2.,  0.,  2.])
-        >>> result is out
-        True
-        """
-        torch.div(x1.data, x2.data, out=out.data)
-
+    ################ Magic Methods (__method_name__) ################
+    
     def __eq__(self, other):
         """Return ``self == other``.
 
@@ -799,62 +829,15 @@ class PytorchTensorSpace(TensorSpace):
         if other is self:
             return True
 
-        return (super(PytorchTensorSpace, self).__eq__(other) and
-                self.weighting == other.weighting)
+        return (
+            super(PytorchTensorSpace, self).__eq__(other)
+            and self.weighting == other.weighting
+            and self.device == other.device
+        )
 
     def __hash__(self):
         """Return ``hash(self)``."""
-        return hash((super(PytorchTensorSpace, self).__hash__(),
-                     self.weighting))
-
-    @property
-    def byaxis(self):
-        """Return the subspace defined along one or several dimensions.
-
-        Examples
-        --------
-        Indexing with integers or slices:
-
-        >>> space = odl.rn((2, 3, 4))  # TODO adapt
-        >>> space.byaxis[0]
-        rn(2)
-        >>> space.byaxis[1:]
-        rn((3, 4))
-
-        Lists can be used to stack spaces arbitrarily:
-
-        >>> space.byaxis[[2, 1, 2]]
-        rn((4, 3, 4))
-        """
-        space = self
-
-        class PytorchTensorSpacebyaxis(object):
-
-            """Helper class for indexing by axis."""
-
-            def __getitem__(self, indices):
-                """Return ``self[indices]``."""
-                try:
-                    iter(indices)
-                except TypeError:
-                    newshape = space.shape[indices]
-                else:
-                    newshape = tuple(space.shape[i] for i in indices)
-
-                if isinstance(space.weighting, ArrayWeighting):
-                    new_array = np.asarray(space.weighting.array[indices])
-                    weighting = PytorchTensorSpaceArrayWeighting(
-                        new_array, space.weighting.exponent)
-                else:
-                    weighting = space.weighting
-
-                return type(space)(newshape, space.dtype, weighting=weighting)
-
-            def __repr__(self):
-                """Return ``repr(self)``."""
-                return repr(space) + '.byaxis'
-
-        return PytorchTensorSpacebyaxis()
+        return hash((super(PytorchTensorSpace, self).__hash__(), self.weighting))
 
     def __repr__(self):
         """Return ``repr(self)``."""
@@ -864,39 +847,35 @@ class PytorchTensorSpace(TensorSpace):
             posargs = [self.shape]
 
         if self.is_real:
-            ctor_name = 'rn'  # TODO adapt
+            ctor_name = "rn"  # TODO adapt
         elif self.is_complex:
-            ctor_name = 'cn'
+            ctor_name = "cn"
         else:
-            ctor_name = 'tensor_space'
+            ctor_name = "tensor_space"
 
-        if (ctor_name == 'tensor_space' or
-                not is_numeric_dtype(self.dtype) or
-                self.dtype != self.default_dtype(self.field)):
-            optargs = [('dtype', dtype_str(self.dtype), '')]
+        if (
+            ctor_name == "tensor_space"
+            or not is_numeric_dtype(self.dtype)
+            or self.dtype != self.default_dtype(self.field)
+        ):
+            optargs = [("dtype", dtype_str(self.dtype), "")]
             if self.dtype in (float, complex, int, bool):
-                optmod = '!s'
+                optmod = "!s"
             else:
-                optmod = ''
+                optmod = ""
         else:
             optargs = []
-            optmod = ''
+            optmod = ""
 
-        inner_str = signature_string(posargs, optargs, mod=['', optmod])
+        inner_str = signature_string(posargs, optargs, mod=["", optmod])
         weight_str = self.weighting.repr_part
         if weight_str:
-            inner_str += ', ' + weight_str
+            inner_str += ", " + weight_str
 
-        return '{}({})'.format(ctor_name, inner_str)
-
-    @property
-    def element_type(self):
-        """Type of elements in this space: `PytorchTensor`."""
-        return PytorchTensor
+        return "{}({})".format(ctor_name, inner_str)
 
 
 class PytorchTensor(Tensor):
-
     """Representation of a `PytorchTensorSpace` element."""
 
     def __init__(self, space, data):
@@ -979,29 +958,6 @@ class PytorchTensor(Tensor):
         """
         return self.space.astype(dtype).element(self.data.astype(dtype))
 
-    @property
-    def data_ptr(self):
-        """A raw pointer to the data container of ``self``.
-
-        Examples
-        --------
-        >>> import ctypes
-        >>> space = odl.tensor_space(3, dtype='uint16')   # TODO check example
-        >>> x = space.element([1, 2, 3])
-        >>> arr_type = ctypes.c_uint16 * 3  # C type "array of 3 uint16"
-        >>> buffer = arr_type.from_address(x.data_ptr)
-        >>> arr = np.frombuffer(buffer, dtype='uint16')
-        >>> arr
-        array([1, 2, 3], dtype=uint16)
-
-        In-place modification via pointer:
-
-        >>> arr[0] = 42    # TODO doubtful if this actually works
-        >>> x
-        tensor_space(3, dtype='uint16').element([42,  2,  3])
-        """
-        return self.data.data_ptr()
-
     def __eq__(self, other):
         """Return ``self == other``.
 
@@ -1038,30 +994,6 @@ class PytorchTensor(Tensor):
             return False
         else:
             return torch.equal(self.data, other.data)
-
-    def copy(self):
-        """Return an identical (deep) copy of this tensor.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        copy : `PytorchTensor`
-            The deep copy
-
-        Examples
-        --------
-        >>> space = odl.rn(3)   # TODO adapt
-        >>> x = space.element([1, 2, 3])
-        >>> y = x.copy()
-        >>> y == x
-        True
-        >>> y is x
-        False
-        """
-        return self.space.element(self.data.clone())
 
     def __copy__(self):
         """Return ``copy(self)``.
@@ -1162,8 +1094,11 @@ class PytorchTensor(Tensor):
             else:
                 weighting = None
             space = type(self.space)(
-                arr.shape, dtype=self.dtype, exponent=self.space.exponent,
-                weighting=weighting)
+                arr.shape,
+                dtype=self.dtype,
+                exponent=self.space.exponent,
+                weighting=weighting,
+            )
             return space.element(arr)
 
     def __setitem__(self, indices, values):
@@ -1302,8 +1237,9 @@ class PytorchTensor(Tensor):
             real_space = self.space.astype(self.space.real_dtype)
             return real_space.element(self.data.real)
         else:
-            raise NotImplementedError('`real` not defined for non-numeric '
-                                      'dtype {}'.format(self.dtype))
+            raise NotImplementedError(
+                "`real` not defined for non-numeric " "dtype {}".format(self.dtype)
+            )
 
     @real.setter
     def real(self, newreal):
@@ -1361,8 +1297,9 @@ class PytorchTensor(Tensor):
             real_space = self.space.astype(self.space.real_dtype)
             return real_space.element(self.data.imag)
         else:
-            raise NotImplementedError('`imag` not defined for non-numeric '
-                                      'dtype {}'.format(self.dtype))
+            raise NotImplementedError(
+                "`imag` not defined for non-numeric " "dtype {}".format(self.dtype)
+            )
 
     @imag.setter
     def imag(self, newimag):
@@ -1381,7 +1318,7 @@ class PytorchTensor(Tensor):
             If the space is real, i.e., no imagninary part can be set.
         """
         if self.space.is_real:
-            raise ValueError('cannot set imaginary part in real spaces')
+            raise ValueError("cannot set imaginary part in real spaces")
         self.imag.data[:] = newimag
 
     def conj(self, out=None):
@@ -1428,15 +1365,17 @@ class PytorchTensor(Tensor):
                 return out
 
         if not is_numeric_dtype(self.space.dtype):
-            raise NotImplementedError('`conj` not defined for non-numeric '
-                                      'dtype {}'.format(self.dtype))
+            raise NotImplementedError(
+                "`conj` not defined for non-numeric " "dtype {}".format(self.dtype)
+            )
 
         if out is None:
             return self.space.element(self.data.conj())
         else:
             if out not in self.space:
-                raise LinearSpaceTypeError('`out` {!r} not in space {!r}'
-                                           ''.format(out, self.space))
+                raise LinearSpaceTypeError(
+                    "`out` {!r} not in space {!r}" "".format(out, self.space)
+                )
             self.data.conj(out.data)
             return out
 
@@ -1466,11 +1405,8 @@ class PytorchTensor(Tensor):
     def __complex__(self):
         """Return ``complex(self)``."""
         if self.size != 1:
-            raise TypeError('only size-1 tensors can be converted to '
-                            'Python scalars')
+            raise TypeError("only size-1 tensors can be converted to " "Python scalars")
         return complex(self.data.ravel()[0])
-
-
 
 
 def _weighting(weights, exponent):
@@ -1575,7 +1511,7 @@ def _pnorm_default(x, p):
 def _pnorm_diagweight(x, p, w):
     """Diagonally weighted p-norm implementation."""
     xp = torch.abs(x.data)
-    if p == float('inf'):
+    if p == float("inf"):
         xp *= w
         return torch.max(xp)
     else:
@@ -1594,9 +1530,7 @@ def _inner_default(x1, x2):
         return torch.vdot(x2.data, x1.data)
 
 
-
 class PytorchTensorSpaceArrayWeighting(ArrayWeighting):
-
     """Weighting of a `PytorchTensorSpace` by an array.
 
     This class defines a weighting by an array that has the same shape
@@ -1667,7 +1601,8 @@ class PytorchTensorSpaceArrayWeighting(ArrayWeighting):
         elif not isinstance(array, torch.Tensor):
             array = torch.tensor(array)
         super(PytorchTensorSpaceArrayWeighting, self).__init__(
-            array, impl='pytorch', exponent=exponent)
+            array, impl="pytorch", exponent=exponent
+        )
 
     def __hash__(self):
         """Return ``hash(self)``."""
@@ -1687,9 +1622,11 @@ class PytorchTensorSpaceArrayWeighting(ArrayWeighting):
             The inner product of the two provided vectors.
         """
         if self.exponent != 2.0:
-            raise NotImplementedError('no inner product defined for '
-                                      'exponent != 2 (got {})'
-                                      ''.format(self.exponent))
+            raise NotImplementedError(
+                "no inner product defined for "
+                "exponent != 2 (got {})"
+                "".format(self.exponent)
+            )
         else:
             inner = _inner_default(x1 * self.array, x2)
             if is_real_dtype(x1.dtype):
@@ -1720,7 +1657,6 @@ class PytorchTensorSpaceArrayWeighting(ArrayWeighting):
 
 
 class PytorchTensorSpaceConstWeighting(ConstWeighting):
-
     """Weighting of a `PytorchTensorSpace` by a constant.
 
     See ``Notes`` for mathematical details.
@@ -1777,7 +1713,8 @@ class PytorchTensorSpaceConstWeighting(ConstWeighting):
           inner product or norm, respectively.
         """
         super(PytorchTensorSpaceConstWeighting, self).__init__(
-            const, impl='pytorch', exponent=exponent)
+            const, impl="pytorch", exponent=exponent
+        )
 
     def inner(self, x1, x2):
         """Return the weighted inner product of ``x1`` and ``x2``.
@@ -1793,9 +1730,11 @@ class PytorchTensorSpaceConstWeighting(ConstWeighting):
             The inner product of the two provided tensors.
         """
         if self.exponent != 2.0:
-            raise NotImplementedError('no inner product defined for '
-                                      'exponent != 2 (got {})'
-                                      ''.format(self.exponent))
+            raise NotImplementedError(
+                "no inner product defined for "
+                "exponent != 2 (got {})"
+                "".format(self.exponent)
+            )
         else:
             inner = self.const * _inner_default(x1, x2)
             if x1.space.field is None:
@@ -1818,11 +1757,12 @@ class PytorchTensorSpaceConstWeighting(ConstWeighting):
         """
         if self.exponent == 2.0:
             return float(np.sqrt(self.const) * _norm_default(x))
-        elif self.exponent == float('inf'):
+        elif self.exponent == float("inf"):
             return float(self.const * _pnorm_default(x, self.exponent))
         else:
-            return float((self.const ** (1 / self.exponent) *
-                          _pnorm_default(x, self.exponent)))
+            return float(
+                (self.const ** (1 / self.exponent) * _pnorm_default(x, self.exponent))
+            )
 
     def dist(self, x1, x2):
         """Return the weighted distance between ``x1`` and ``x2``.
@@ -1839,15 +1779,18 @@ class PytorchTensorSpaceConstWeighting(ConstWeighting):
         """
         if self.exponent == 2.0:
             return float(np.sqrt(self.const) * _norm_default(x1 - x2))
-        elif self.exponent == float('inf'):
+        elif self.exponent == float("inf"):
             return float(self.const * _pnorm_default(x1 - x2, self.exponent))
         else:
-            return float((self.const ** (1 / self.exponent) *
-                          _pnorm_default(x1 - x2, self.exponent)))
+            return float(
+                (
+                    self.const ** (1 / self.exponent)
+                    * _pnorm_default(x1 - x2, self.exponent)
+                )
+            )
 
 
 class PytorchTensorSpaceCustomInner(CustomInner):
-
     """Class for handling a user-specified inner product."""
 
     def __init__(self, inner):
@@ -1865,11 +1808,10 @@ class PytorchTensorSpaceCustomInner(CustomInner):
             - ``<s*x + y, z> = s * <x, z> + <y, z>``
             - ``<x, x> = 0``  if and only if  ``x = 0``
         """
-        super(PytorchTensorSpaceCustomInner, self).__init__(inner, impl='pytorch')
+        super(PytorchTensorSpaceCustomInner, self).__init__(inner, impl="pytorch")
 
 
 class PytorchTensorSpaceCustomNorm(CustomNorm):
-
     """Class for handling a user-specified norm.
 
     Note that this removes ``inner``.
@@ -1891,11 +1833,10 @@ class PytorchTensorSpaceCustomNorm(CustomNorm):
             - ``||s * x|| = |s| * ||x||``
             - ``||x + y|| <= ||x|| + ||y||``
         """
-        super(PytorchTensorSpaceCustomNorm, self).__init__(norm, impl='pytorch')
+        super(PytorchTensorSpaceCustomNorm, self).__init__(norm, impl="pytorch")
 
 
 class PytorchTensorSpaceCustomDist(CustomDist):
-
     """Class for handling a user-specified distance in `TensorSpace`.
 
     Note that this removes ``inner`` and ``norm``.
@@ -1917,9 +1858,10 @@ class PytorchTensorSpaceCustomDist(CustomDist):
             - ``dist(x, y) = dist(y, x)``
             - ``dist(x, y) <= dist(x, z) + dist(z, y)``
         """
-        super(PytorchTensorSpaceCustomDist, self).__init__(dist, impl='pytorch')
+        super(PytorchTensorSpaceCustomDist, self).__init__(dist, impl="pytorch")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from odl.util.testutils import run_doctests
+
     run_doctests()
