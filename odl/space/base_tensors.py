@@ -338,13 +338,6 @@ class TensorSpace(LinearSpace):
         """Total number of bytes in memory used by an element of this space."""
         return self.size * self.itemsize
 
-    def np_dtype(self):
-        """Equivalent numpy type of space.type.
-
-        This method should be overridden by subclasses.
-        """
-        raise NotImplementedError("abstract method")
-
     def __contains__(self, other):
         """Return ``other in self``.
 

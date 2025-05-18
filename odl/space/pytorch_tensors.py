@@ -488,6 +488,7 @@ class PytorchTensorSpace(TensorSpace):
 
     @property
     def tensor_type(self):
+        """Type of ODL tensor associated with the Space"""
         return PytorchTensor
     
     @property

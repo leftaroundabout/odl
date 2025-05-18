@@ -388,7 +388,7 @@ class NumpyTensorSpace(TensorSpace):
     
     @property
     def tensor_type(self):
-        """Exponent of the norm and the distance."""
+        """Type of ODL tensor associated with the Space"""
         return NumpyTensor
 
     @staticmethod
