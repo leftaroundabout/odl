@@ -18,7 +18,7 @@ from contextlib import contextmanager
 from time import time
 
 import numpy as np
-from odl.util.npy_compat import AVOID_UNNECESSARY_COPY
+from odl.space.npy_tensors import NUMPY_DTYPES
 
 from future.moves.itertools import zip_longest
 from odl.util.utility import is_string, run_from_ipython
@@ -341,21 +341,21 @@ def noise_array(space):
 
 
 def noise_numpy_array(space):  
-    if space.np_dtype == bool:
+    if NUMPY_DTYPES[space.dtype_as_str] == bool:
         arr = np.random.randint(0, 2, size=space.shape, dtype=bool)
-    elif np.issubdtype(space.np_dtype, np.unsignedinteger):
+    elif np.issubdtype(NUMPY_DTYPES[space.dtype_as_str], np.unsignedinteger):
         arr = np.random.randint(0, 10, space.shape)
-    elif np.issubdtype(space.np_dtype, np.signedinteger):
+    elif np.issubdtype(NUMPY_DTYPES[space.dtype_as_str], np.signedinteger):
         arr = np.random.randint(-10, 10, space.shape)
-    elif np.issubdtype(space.np_dtype, np.floating):
+    elif np.issubdtype(NUMPY_DTYPES[space.dtype_as_str], np.floating):
         arr = np.random.randn(*space.shape)
-    elif np.issubdtype(space.np_dtype, np.complexfloating):
+    elif np.issubdtype(NUMPY_DTYPES[space.dtype_as_str], np.complexfloating):
         arr = (
             np.random.randn(*space.shape)
             + 1j * np.random.randn(*space.shape)
         ) / np.sqrt(2.0)
     else:
-        raise ValueError('bad dtype {}'.format(space.np_dtype))
+        raise ValueError('bad dtype {}'.format(NUMPY_DTYPES[space.dtype_as_str]))
 
     return arr
 
