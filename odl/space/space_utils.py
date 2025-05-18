@@ -12,15 +12,15 @@ from __future__ import print_function, division, absolute_import
 import numpy as np
 
 from odl.util.npy_compat import AVOID_UNNECESSARY_COPY
-
+from odl.util.utility import AVAILABLE_DTYPES
+from odl.space.entry_points import TENSOR_SPACE_IMPLS, tensor_space_impl
 from odl.set import RealNumbers, ComplexNumbers
-from odl.space.entry_points import tensor_space_impl
 from odl.space.base_tensors import TensorSpace
 
-__all__ = ('vector', 'tensor_space', 'cn', 'rn')
+__all__ = ("vector", "tensor_space", "cn", "rn")
 
 
-def vector(array, dtype=None, order=None, impl='numpy'):
+def vector(array, dtype=None, order=None, impl="numpy"):
     """Create a vector from an array-like object.
 
     Parameters
@@ -78,7 +78,7 @@ def vector(array, dtype=None, order=None, impl='numpy'):
     # Sanitize input
     arr = np.array(array, copy=AVOID_UNNECESSARY_COPY, order=order, ndmin=1)
     if arr.dtype is object:
-        raise ValueError('invalid input data resulting in `dtype==object`')
+        raise ValueError("invalid input data resulting in `dtype==object`")
 
     # Set dtype
     if dtype is not None:
@@ -91,8 +91,8 @@ def vector(array, dtype=None, order=None, impl='numpy'):
 
 
 def tensor_space(
-        shape, dtype=None, impl='numpy', device='cpu', **kwargs
-        ) -> TensorSpace:
+    shape, dtype="float32", impl="numpy", device="cpu", **kwargs
+) -> TensorSpace:
     """Return a tensor space with arbitrary scalar data type.
 
     Parameters
@@ -107,7 +107,7 @@ def tensor_space(
         For ``None``, the `TensorSpace.default_dtype` of the
         created space is used.
     impl : str, optional
-        Impmlementation back-end for the space. See
+        Implementation back-end for the space. See
         `odl.space.entry_points.tensor_space_impl_names` for available
         options.
     kwargs :
@@ -143,17 +143,21 @@ def tensor_space(
     --------
     rn, cn : Constructors for real and complex spaces
     """
-    tspace_cls = tensor_space_impl(impl)
-
-    if dtype is None:
-        dtype = tspace_cls.default_dtype()
+    # Check the dtype argument
+    assert (
+        dtype in AVAILABLE_DTYPES
+    ), f"The dtype must be in {AVAILABLE_DTYPES}, but {dtype} was provided"
+    # Check the impl argument
+    assert (
+        impl in TENSOR_SPACE_IMPLS.keys()
+    ), f"The only supported impls are {TENSOR_SPACE_IMPLS.keys()}, but {impl} was provided"
 
     # Use args by keyword since the constructor may take other arguments
     # by position
-    return tspace_cls(shape=shape, dtype=dtype, device=device, **kwargs)
+    return TENSOR_SPACE_IMPLS[impl](shape=shape, dtype=dtype, device=device, **kwargs)
 
 
-def cn(shape, dtype=None, impl='numpy', **kwargs):
+def cn(shape, dtype=None, impl="numpy", **kwargs):
     """Return a space of complex tensors.
 
     Parameters
@@ -214,12 +218,13 @@ def cn(shape, dtype=None, impl='numpy', **kwargs):
     # by position
     cn = cn_cls(shape=shape, dtype=dtype, **kwargs)
     if not cn.is_complex:
-        raise ValueError('data type {!r} not a complex floating-point type.'
-                         ''.format(dtype))
+        raise ValueError(
+            "data type {!r} not a complex floating-point type." "".format(dtype)
+        )
     return cn
 
 
-def rn(shape, dtype=None, impl='numpy', **kwargs):
+def rn(shape, dtype=None, impl="numpy", **kwargs) -> TensorSpace:
     """Return a space of real tensors.
 
     Parameters
@@ -280,11 +285,13 @@ def rn(shape, dtype=None, impl='numpy', **kwargs):
     # by position
     rn = rn_cls(shape=shape, dtype=dtype, **kwargs)
     if not rn.is_real:
-        raise ValueError('data type {!r} not a real floating-point type.'
-                         ''.format(dtype))
+        raise ValueError(
+            "data type {!r} not a real floating-point type." "".format(dtype)
+        )
     return rn
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from odl.util.testutils import run_doctests
+
     run_doctests()
