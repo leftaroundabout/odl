@@ -11,7 +11,6 @@
 from __future__ import absolute_import, division, print_function
 
 from builtins import object
-
 import numpy as np
 import torch
 
@@ -348,6 +347,12 @@ class PytorchTensorSpace(TensorSpace):
         return kwargs
 
     ################ Properties ################
+    # @property
+    # def array_constructor(self):
+    #     """Name of the array_constructor of this tensor set.
+    #     """
+    #     return torch.tensor
+    
     @property
     def array_namespace(self):
         """Name of the array_namespace"""
@@ -359,6 +364,10 @@ class PytorchTensorSpace(TensorSpace):
         This relates to the python array api
         """
         return torch.Tensor
+    
+    @property
+    def available_dtypes(self):
+        return TORCH_DTYPES
     
     @property
     def byaxis(self):
@@ -493,7 +502,7 @@ class PytorchTensorSpace(TensorSpace):
         """This space's weighting scheme."""
         return self.__weighting   
 
-    ################ Methods (Non-static) ################
+    ################ Methods (Non-static) ################    
     def as_suitable_scalar(self, s):
         """Try to convert `s` to a type that can be scalar-multiplied with
         torch tensors.

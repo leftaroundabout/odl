@@ -11,6 +11,7 @@ from __future__ import absolute_import, division, print_function
 
 from types import ModuleType
 from numbers import Integral
+from typing import Dict
 
 import numpy as np
 import torch
@@ -134,6 +135,14 @@ class TensorSpace(LinearSpace):
         return field
 
     ################ Properties ################
+    # @property
+    # def array_constructor(self):
+    #     """Name of the array_constructor of this tensor set.
+
+    #     This property should be overridden by subclasses.
+    #     """
+    #     raise NotImplementedError("abstract method")
+    
     @property
     def array_namespace(self) -> ModuleType:
         """Name of the array_namespace of this tensor set. This relates to the
@@ -149,6 +158,12 @@ class TensorSpace(LinearSpace):
         python array api.
 
         This property should be overridden by subclasses.
+        """
+        raise NotImplementedError("abstract method")
+    
+    @property
+    def available_dtypes(self) -> Dict:
+        """Available types of the tensor space implementation
         """
         raise NotImplementedError("abstract method")
     
@@ -275,7 +290,7 @@ class TensorSpace(LinearSpace):
     @property
     def itemsize(self):
         """Size in bytes of one entry in an element of this space."""
-        return int(self.dtype.itemsize)
+        return int(self.array_constructor([], dtype=self.dtype).itemsize)
     
     @property
     def nbytes(self):

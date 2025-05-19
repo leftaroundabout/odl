@@ -10,7 +10,6 @@
 
 from __future__ import absolute_import, division, print_function
 from future.utils import native
-
 from builtins import object
 from functools import partial
 
@@ -345,6 +344,12 @@ class NumpyTensorSpace(TensorSpace):
             self.__weighting = NumpyTensorSpaceConstWeighting(1.0, exponent)
 
     ################ Properties ################
+    # @property
+    # def array_constructor(self):
+    #     """Name of the array_constructor of this tensor set.
+    #     """
+    #     return np.ndarray
+    
     @property
     def array_namespace(self):
         """Name of the array_namespace"""
@@ -356,6 +361,10 @@ class NumpyTensorSpace(TensorSpace):
         This relates to the python array api
         """
         return np.ndarray
+    
+    @property
+    def available_dtypes(self):
+        return NUMPY_DTYPES
     
     @property
     def byaxis(self):
