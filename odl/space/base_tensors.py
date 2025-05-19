@@ -135,13 +135,13 @@ class TensorSpace(LinearSpace):
         return field
 
     ################ Properties ################
-    # @property
-    # def array_constructor(self):
-    #     """Name of the array_constructor of this tensor set.
+    @property
+    def array_constructor(self):
+        """Name of the array_constructor of this tensor set.
 
-    #     This property should be overridden by subclasses.
-    #     """
-    #     raise NotImplementedError("abstract method")
+        This property should be overridden by subclasses.
+        """
+        raise NotImplementedError("abstract method")
     
     @property
     def array_namespace(self) -> ModuleType:

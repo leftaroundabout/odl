@@ -347,11 +347,11 @@ class PytorchTensorSpace(TensorSpace):
         return kwargs
 
     ################ Properties ################
-    # @property
-    # def array_constructor(self):
-    #     """Name of the array_constructor of this tensor set.
-    #     """
-    #     return torch.tensor
+    @property
+    def array_constructor(self):
+        """Name of the array_constructor of this tensor set.
+        """
+        return torch.tensor
     
     @property
     def array_namespace(self):
