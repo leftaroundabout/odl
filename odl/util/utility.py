@@ -21,6 +21,7 @@ from typing import Optional
 import numpy as np
 import torch
 import array_api_compat.numpy as npy_compat
+from odl.util.npy_compat import AVOID_UNNECESSARY_COPY
 
 __all__ = (
     "REPR_PRECISION",
@@ -136,6 +137,22 @@ TYPE_PROMOTION_COMPLEX_TO_REAL = {
 # <!> This constant dict holds the array_namespace associated  to the str id of a backend
 # <!> This refers to the python array API array_namespace
 ARRAY_NAMESPACES = {"numpy": npy_compat}
+
+NP_DTYPES = {
+        "bool": np.bool,
+        "int8": np.int8,
+        "int16": np.int16,
+        "int32": np.int32,
+        "int64": np.int64,
+        "uint8": np.uint8,
+        "uint16": np.uint16,
+        "uint32": np.uint32,
+        "uint64": np.uint64,
+        "float32": np.float32,
+        "float64": np.float64,
+        "complex64": np.complex64,
+        "complex128": np.complex128,
+    }
 
 def indent(string, indent_str="    "):
     """Return a copy of ``string`` indented by ``indent_str``.
@@ -536,7 +553,7 @@ def real_dtype(dtype, default=None):
         return dtype
 
     try:
-        real_base_dtype = TYPE_MAP_C2R[dtype.base]
+        real_base_dtype = TYPE_PROMOTION_COMPLEX_TO_REAL[dtype.base]
     except KeyError:
         if default is not None:
             return default
@@ -596,7 +613,7 @@ def complex_dtype(dtype, default=None):
         return dtype
 
     try:
-        complex_base_dtype = TYPE_MAP_R2C[dtype.base]
+        complex_base_dtype = TYPE_PROMOTION_REAL_TO_COMPLEX[dtype.base]
     except KeyError:
         if default is not None:
             return default

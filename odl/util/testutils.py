@@ -18,10 +18,9 @@ from contextlib import contextmanager
 from time import time
 
 import numpy as np
-from odl.space.npy_tensors import NUMPY_DTYPES
 
 from future.moves.itertools import zip_longest
-from odl.util.utility import is_string, run_from_ipython
+from odl.util.utility import is_string, run_from_ipython, NP_DTYPES
 
 __all__ = (
     'dtype_ndigits',
@@ -341,21 +340,21 @@ def noise_array(space):
 
 
 def noise_numpy_array(space):  
-    if NUMPY_DTYPES[space.dtype_as_str] == bool:
+    if NP_DTYPES[space.dtype_as_str] == bool:
         arr = np.random.randint(0, 2, size=space.shape, dtype=bool)
-    elif np.issubdtype(NUMPY_DTYPES[space.dtype_as_str], np.unsignedinteger):
+    elif np.issubdtype(NP_DTYPES[space.dtype_as_str], np.unsignedinteger):
         arr = np.random.randint(0, 10, space.shape)
-    elif np.issubdtype(NUMPY_DTYPES[space.dtype_as_str], np.signedinteger):
+    elif np.issubdtype(NP_DTYPES[space.dtype_as_str], np.signedinteger):
         arr = np.random.randint(-10, 10, space.shape)
-    elif np.issubdtype(NUMPY_DTYPES[space.dtype_as_str], np.floating):
+    elif np.issubdtype(NP_DTYPES[space.dtype_as_str], np.floating):
         arr = np.random.randn(*space.shape)
-    elif np.issubdtype(NUMPY_DTYPES[space.dtype_as_str], np.complexfloating):
+    elif np.issubdtype(NP_DTYPES[space.dtype_as_str], np.complexfloating):
         arr = (
             np.random.randn(*space.shape)
             + 1j * np.random.randn(*space.shape)
         ) / np.sqrt(2.0)
     else:
-        raise ValueError('bad dtype {}'.format(NUMPY_DTYPES[space.dtype_as_str]))
+        raise ValueError('bad dtype {}'.format(NP_DTYPES[space.dtype_as_str]))
 
     return arr
 
