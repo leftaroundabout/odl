@@ -235,15 +235,53 @@ class NumpyTensorSpace(TensorSpace):
         """
         super(NumpyTensorSpace, self).__init__(shape, dtype, device)
 
-        if dtype not in NUMPY_DTYPES:
-            raise ValueError('`dtype` {!r} not supported'
-                             ''.format(dtype))
+        # Dtype check and parsing 
+        self.parse_dtype(dtype)
+
+        # Device check and parsing
+        self.parse_device(device)
+
+        # Weighting Check and parsing
+        self.kwargs = self.parse_weighting(dtype, kwargs)
+
+        # In-place ops check
+        self._use_in_place_ops = kwargs.pop("use_in_place_ops", True)
+
+        # Make sure there are no leftover kwargs
+        if kwargs:
+            raise TypeError("got unknown keyword arguments {}".format(kwargs))
         
+    ################ Init Methods, Non static ################
+    def parse_dtype(self, dtype:str):
+        """
+        Process the dtype argument. This parses the (str) dtype input argument to a torch.dtype and sets two attributes
+
+        self.dtype_as_str (str)    -> Used for passing dtype information from one backend to another
+        self.__dtype (np.dtype) -> Actual dtype of the TensorSpace implementation
+
+        Note:
+        The check below is here just in case a user initialise a space directly from this class, which is not recommended
+        """
+        if dtype not in NUMPY_DTYPES:
+            raise ValueError("`dtype` {!r} not supported" "".format(dtype_str(dtype)))
+
         self.__dtype_as_str = dtype
         self.__dtype = NUMPY_DTYPES[dtype]
+
+    def parse_device(self, device:str):
+        """
+        Process the device argument 
+        This checks that the device requested is available and sets one attribute
+        self.__device (str) -> The device on which the TensorSpace lives
+        Note:
+        As ot Python Array API v2024.12, there is no Device object. So, for a NumpyTensorSpace,
+        self.__device is a string always equal to `cpu`
+        """
+        assert device == 'cpu', f"For NumpyTensorSpace, only cpu is supported, but {device} was provided."
         
-        ### Unpacking the device argument
-        assert device == 'cpu', f"Only 'cpu' is supported for numpy tensor space, got {device}"
+        self.__device = 'cpu'
+
+    def parse_weighting(self, dtype, kwargs):
         dist = kwargs.pop('dist', None)
         norm = kwargs.pop('norm', None)
         inner = kwargs.pop('inner', None)
@@ -306,12 +344,7 @@ class NumpyTensorSpace(TensorSpace):
             # No weighting, i.e., weighting with constant 1.0
             self.__weighting = NumpyTensorSpaceConstWeighting(1.0, exponent)
 
-        self.__use_in_place_ops = kwargs.pop('use_in_place_ops', True)
-
-        # Make sure there are no leftover kwargs
-        if kwargs:
-            raise TypeError('got unknown keyword arguments {}'.format(kwargs))
-
+    ################ Properties ################
     @property
     def array_namespace(self):
         """Name of the array_namespace"""
@@ -323,355 +356,7 @@ class NumpyTensorSpace(TensorSpace):
         This relates to the python array api
         """
         return np.ndarray
-
-    @property
-    def impl(self):
-        """Name of the implementation back-end: ``'numpy'``."""
-        return 'numpy'
-
-    @property
-    def dtype(self):
-        """Scalar data type of each entry in an element of this space."""
-        return self.__dtype
-
-    @property
-    def dtype_as_str(self):
-        """Scalar data type of each entry in an element of this space as a string."""
-        return self.__dtype_as_str
     
-    @property
-    def supported_num_operation_paradigms(self) -> NumOperationParadigmSupport:
-        """NumPy has full support for in-place operation, which is usually
-        advantageous to reduce memory allocations.
-        This can be deactivated, mostly for testing purposes, by setting
-        `use_in_place_ops = False` when constructing the space."""
-        if self.__use_in_place_ops:
-            return SupportedNumOperationParadigms(
-                    in_place = NumOperationParadigmSupport.PREFERRED,
-                    out_of_place = NumOperationParadigmSupport.SUPPORTED)
-        else:
-            return SupportedNumOperationParadigms(
-                    in_place = NumOperationParadigmSupport.NOT_SUPPORTED,
-                    out_of_place = NumOperationParadigmSupport.PREFERRED)
-
-    @property
-    def device(self):
-        """Device identifier."""
-        return 'cpu'
-
-    @property
-    def default_order(self):
-        """Default storage order for new elements in this space: ``'C'``."""
-        return 'C'
-
-    @property
-    def weighting(self):
-        """This space's weighting scheme."""
-        return self.__weighting
-
-    @property
-    def is_weighted(self):
-        """Return ``True`` if the space is not weighted by constant 1.0."""
-        return not (
-            isinstance(self.weighting, NumpyTensorSpaceConstWeighting) and
-            self.weighting.const == 1.0)
-
-    @property
-    def exponent(self):
-        """Exponent of the norm and the distance."""
-        return self.weighting.exponent
-    
-    @property
-    def tensor_type(self):
-        """Type of ODL tensor associated with the Space"""
-        return NumpyTensor
-
-    @staticmethod
-    def default_dtype(field=None):
-        """Return the default data type of this class for a given field.
-
-        Parameters
-        ----------
-        field : `Field`, optional
-            Set of numbers to be represented by a data type.
-            Currently supported : `RealNumbers`, `ComplexNumbers`
-            The default ``None`` means `RealNumbers`
-
-        Returns
-        -------
-        dtype : `numpy.dtype`
-            Numpy data type specifier. The returned defaults are:
-
-                ``RealNumbers()`` : ``np.dtype('float32')``
-
-                ``ComplexNumbers()`` : ``np.dtype('complex64')``
-        """
-        if field is None or field == RealNumbers():
-            return np.float32
-        elif field == ComplexNumbers():
-            return np.complex64
-        else:
-            raise ValueError('no default data type defined for field {}'
-                             ''.format(field))
-
-    def _lincomb(self, a, x1, b, x2, out):
-        """Implement the linear combination of ``x1`` and ``x2``.
-
-        Compute ``out = a*x1 + b*x2`` using optimized
-        BLAS routines if possible.
-
-        This function is part of the subclassing API. Do not
-        call it directly.
-
-        Parameters
-        ----------
-        a, b : `TensorSpace.field` element
-            Scalars to multiply ``x1`` and ``x2`` with.
-        x1, x2 : `NumpyTensor`
-            Summands in the linear combination.
-        out : `NumpyTensor`
-            Tensor to which the result is written.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)
-        >>> x = space.element([0, 1, 1])
-        >>> y = space.element([0, 0, 1])
-        >>> out = space.element()
-        >>> result = space.lincomb(1, x, 2, y, out)
-        >>> result
-        rn(3).element([ 0.,  1.,  3.])
-        >>> result is out
-        True
-        """
-        if self.__use_in_place_ops:
-            assert(out is not None)
-            _lincomb_impl(a, x1, b, x2, out)
-        else:
-            assert(out is None)
-            return self.element(a * x1.data + b * x2.data)
-
-    def _dist(self, x1, x2):
-        """Return the distance between ``x1`` and ``x2``.
-
-        This function is part of the subclassing API. Do not
-        call it directly.
-
-        Parameters
-        ----------
-        x1, x2 : `NumpyTensor`
-            Elements whose mutual distance is calculated.
-
-        Returns
-        -------
-        dist : `float`
-            Distance between the elements.
-
-        Examples
-        --------
-        Different exponents result in difference metrics:
-
-        >>> space_2 = odl.rn(3, exponent=2)
-        >>> x = space_2.element([-1, -1, 2])
-        >>> y = space_2.one()
-        >>> space_2.dist(x, y)
-        3.0
-
-        >>> space_1 = odl.rn(3, exponent=1)
-        >>> x = space_1.element([-1, -1, 2])
-        >>> y = space_1.one()
-        >>> space_1.dist(x, y)
-        5.0
-
-        Weighting is supported, too:
-
-        >>> space_1_w = odl.rn(3, exponent=1, weighting=[2, 1, 1])
-        >>> x = space_1_w.element([-1, -1, 2])
-        >>> y = space_1_w.one()
-        >>> space_1_w.dist(x, y)
-        7.0
-        """
-        return self.weighting.dist(x1, x2)
-
-    def _norm(self, x):
-        """Return the norm of ``x``.
-
-        This function is part of the subclassing API. Do not
-        call it directly.
-
-        Parameters
-        ----------
-        x : `NumpyTensor`
-            Element whose norm is calculated.
-
-        Returns
-        -------
-        norm : `float`
-            Norm of the element.
-
-        Examples
-        --------
-        Different exponents result in difference norms:
-
-        >>> space_2 = odl.rn(3, exponent=2)
-        >>> x = space_2.element([3, 0, 4])
-        >>> space_2.norm(x)
-        5.0
-        >>> space_1 = odl.rn(3, exponent=1)
-        >>> x = space_1.element([3, 0, 4])
-        >>> space_1.norm(x)
-        7.0
-
-        Weighting is supported, too:
-
-        >>> space_1_w = odl.rn(3, exponent=1, weighting=[2, 1, 1])
-        >>> x = space_1_w.element([3, 0, 4])
-        >>> space_1_w.norm(x)
-        10.0
-        """
-        return self.weighting.norm(x)
-
-    def _inner(self, x1, x2):
-        """Return the inner product of ``x1`` and ``x2``.
-
-        This function is part of the subclassing API. Do not
-        call it directly.
-
-        Parameters
-        ----------
-        x1, x2 : `NumpyTensor`
-            Elements whose inner product is calculated.
-
-        Returns
-        -------
-        inner : `field` `element`
-            Inner product of the elements.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)
-        >>> x = space.element([1, 0, 3])
-        >>> y = space.one()
-        >>> space.inner(x, y)
-        4.0
-
-        Weighting is supported, too:
-
-        >>> space_w = odl.rn(3, weighting=[2, 1, 1])
-        >>> x = space_w.element([1, 0, 3])
-        >>> y = space_w.one()
-        >>> space_w.inner(x, y)
-        5.0
-        """
-        return self.weighting.inner(x1, x2)
-
-    def _multiply(self, x1, x2, out):
-        """Compute the entry-wise product ``out = x1 * x2``.
-
-        This function is part of the subclassing API. Do not
-        call it directly.
-
-        Parameters
-        ----------
-        x1, x2 : `NumpyTensor`
-            Factors in the product.
-        out : `NumpyTensor`
-            Element to which the result is written.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)
-        >>> x = space.element([1, 0, 3])
-        >>> y = space.element([-1, 1, -1])
-        >>> space.multiply(x, y)
-        rn(3).element([-1.,  0., -3.])
-        >>> out = space.element()
-        >>> result = space.multiply(x, y, out=out)
-        >>> result
-        rn(3).element([-1.,  0., -3.])
-        >>> result is out
-        True
-        """
-        if out is None:
-            return np.multiply(x1.data, x2.data)
-        else:
-            np.multiply(x1.data, x2.data, out=out.data)
-
-    def _divide(self, x1, x2, out):
-        """Compute the entry-wise quotient ``x1 / x2``.
-
-        This function is part of the subclassing API. Do not
-        call it directly.
-
-        Parameters
-        ----------
-        x1, x2 : `NumpyTensor`
-            Dividend and divisor in the quotient.
-        out : `NumpyTensor`
-            Element to which the result is written.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)
-        >>> x = space.element([2, 0, 4])
-        >>> y = space.element([1, 1, 2])
-        >>> space.divide(x, y)
-        rn(3).element([ 2.,  0.,  2.])
-        >>> out = space.element()
-        >>> result = space.divide(x, y, out=out)
-        >>> result
-        rn(3).element([ 2.,  0.,  2.])
-        >>> result is out
-        True
-        """
-        if out is None:
-            return np.divide(x1.data, x2.data)
-        else:
-            np.divide(x1.data, x2.data, out=out.data)
-
-    def __eq__(self, other):
-        """Return ``self == other``.
-
-        Returns
-        -------
-        equals : bool
-            True if ``other`` is an instance of ``type(self)``
-            with the same `NumpyTensorSpace.shape`, `NumpyTensorSpace.dtype`
-            and `NumpyTensorSpace.weighting`, otherwise False.
-
-        Examples
-        --------
-        >>> space = odl.rn(3)
-        >>> same_space = odl.rn(3, exponent=2)
-        >>> same_space == space
-        True
-
-        Different `shape`, `exponent` or `dtype` all result in different
-        spaces:
-
-        >>> diff_space = odl.rn((3, 4))
-        >>> diff_space == space
-        False
-        >>> diff_space = odl.rn(3, exponent=1)
-        >>> diff_space == space
-        False
-        >>> diff_space = odl.rn(3, dtype='float32')
-        >>> diff_space == space
-        False
-        >>> space == object
-        False
-        """
-        if other is self:
-            return True
-
-        return (super(NumpyTensorSpace, self).__eq__(other) and
-                self.weighting == other.weighting)
-
-    def __hash__(self):
-        """Return ``hash(self)``."""
-        return hash((super(NumpyTensorSpace, self).__hash__(),
-                     self.weighting))
-
     @property
     def byaxis(self):
         """Return the subspace defined along one or several dimensions.
@@ -720,6 +405,385 @@ class NumpyTensorSpace(TensorSpace):
                 return repr(space) + '.byaxis'
 
         return NpyTensorSpacebyaxis()
+    
+    @property
+    def data_ptr(self):
+        """A raw pointer to the data container of ``self``.
+
+        Examples
+        --------
+        >>> import ctypes
+        >>> space = odl.tensor_space(3, dtype='uint16')
+        >>> x = space.element([1, 2, 3])
+        >>> arr_type = ctypes.c_uint16 * 3  # C type "array of 3 uint16"
+        >>> buffer = arr_type.from_address(x.data_ptr)
+        >>> arr = np.frombuffer(buffer, dtype='uint16')
+        >>> arr
+        array([1, 2, 3], dtype=uint16)
+
+        In-place modification via pointer:
+
+        >>> arr[0] = 42
+        >>> x
+        tensor_space(3, dtype='uint16').element([42,  2,  3])
+        """
+        return self.data.ctypes.data
+    
+    @property
+    def device(self):
+        """Device identifier."""
+        return self.__device
+    
+    @property
+    def dtype(self):
+        """Scalar data type of each entry in an element of this space."""
+        return self.__dtype
+
+    @property
+    def dtype_as_str(self):
+        """Scalar data type of each entry in an element of this space as a string."""
+        return self.__dtype_as_str
+    
+    @property
+    def exponent(self):
+        """Exponent of the norm and the distance."""
+        return self.weighting.exponent
+    
+    @property
+    def impl(self):
+        """Name of the implementation back-end: ``'numpy'``."""
+        return 'numpy'
+    
+    @property
+    def is_weighted(self):
+        """Return ``True`` if the space is not weighted by constant 1.0."""
+        return not (
+            isinstance(self.weighting, NumpyTensorSpaceConstWeighting) and
+            self.weighting.const == 1.0)
+    
+    @property
+    def supported_num_operation_paradigms(self) -> NumOperationParadigmSupport:
+        """NumPy has full support for in-place operation, which is usually
+        advantageous to reduce memory allocations.
+        This can be deactivated, mostly for testing purposes, by setting
+        `use_in_place_ops = False` when constructing the space."""
+        if self.__use_in_place_ops:
+            return SupportedNumOperationParadigms(
+                    in_place = NumOperationParadigmSupport.PREFERRED,
+                    out_of_place = NumOperationParadigmSupport.SUPPORTED)
+        else:
+            return SupportedNumOperationParadigms(
+                    in_place = NumOperationParadigmSupport.NOT_SUPPORTED,
+                    out_of_place = NumOperationParadigmSupport.PREFERRED)
+    
+    @property
+    def tensor_type(self):
+        """Type of ODL tensor associated with the Space"""
+        return NumpyTensor
+    
+    @property
+    def weighting(self):
+        """This space's weighting scheme."""
+        return self.__weighting
+    
+    ################ Methods (Non-static) ################
+    def as_suitable_scalar(self, s):
+        """Try to convert `s` to a type that can be scalar-multiplied with
+        numpy arrays.
+        """
+        return self.dtype.type(s)
+    
+    def is_suitable_scalar(self, s):
+        return type(s) is self.dtype.type
+
+    ################ Methods (Static) ################
+    @staticmethod
+    def default_dtype(field=None):
+        """Return the default data type of this class for a given field.
+
+        Parameters
+        ----------
+        field : `Field`, optional
+            Set of numbers to be represented by a data type.
+            Currently supported : `RealNumbers`, `ComplexNumbers`
+            The default ``None`` means `RealNumbers`
+
+        Returns
+        -------
+        dtype : `numpy.dtype`
+            Numpy data type specifier. The returned defaults are:
+
+                ``RealNumbers()`` : ``np.dtype('float32')``
+
+                ``ComplexNumbers()`` : ``np.dtype('complex64')``
+        """
+        if field is None or field == RealNumbers():
+            return np.float32
+        elif field == ComplexNumbers():
+            return np.complex64
+        else:
+            raise ValueError('no default data type defined for field {}'
+                             ''.format(field))
+
+    ################ Methods (Subclassing API)  ################
+    def _dist(self, x1, x2):
+        """Return the distance between ``x1`` and ``x2``.
+
+        This function is part of the subclassing API. Do not
+        call it directly.
+
+        Parameters
+        ----------
+        x1, x2 : `NumpyTensor`
+            Elements whose mutual distance is calculated.
+
+        Returns
+        -------
+        dist : `float`
+            Distance between the elements.
+
+        Examples
+        --------
+        Different exponents result in difference metrics:
+
+        >>> space_2 = odl.rn(3, exponent=2)
+        >>> x = space_2.element([-1, -1, 2])
+        >>> y = space_2.one()
+        >>> space_2.dist(x, y)
+        3.0
+
+        >>> space_1 = odl.rn(3, exponent=1)
+        >>> x = space_1.element([-1, -1, 2])
+        >>> y = space_1.one()
+        >>> space_1.dist(x, y)
+        5.0
+
+        Weighting is supported, too:
+
+        >>> space_1_w = odl.rn(3, exponent=1, weighting=[2, 1, 1])
+        >>> x = space_1_w.element([-1, -1, 2])
+        >>> y = space_1_w.one()
+        >>> space_1_w.dist(x, y)
+        7.0
+        """
+        return self.weighting.dist(x1, x2)
+    
+    def _divide(self, x1, x2, out):
+        """Compute the entry-wise quotient ``x1 / x2``.
+
+        This function is part of the subclassing API. Do not
+        call it directly.
+
+        Parameters
+        ----------
+        x1, x2 : `NumpyTensor`
+            Dividend and divisor in the quotient.
+        out : `NumpyTensor`
+            Element to which the result is written.
+
+        Examples
+        --------
+        >>> space = odl.rn(3)
+        >>> x = space.element([2, 0, 4])
+        >>> y = space.element([1, 1, 2])
+        >>> space.divide(x, y)
+        rn(3).element([ 2.,  0.,  2.])
+        >>> out = space.element()
+        >>> result = space.divide(x, y, out=out)
+        >>> result
+        rn(3).element([ 2.,  0.,  2.])
+        >>> result is out
+        True
+        """
+        if out is None:
+            return np.divide(x1.data, x2.data)
+        else:
+            np.divide(x1.data, x2.data, out=out.data)
+
+    def _inner(self, x1, x2):
+        """Return the inner product of ``x1`` and ``x2``.
+
+        This function is part of the subclassing API. Do not
+        call it directly.
+
+        Parameters
+        ----------
+        x1, x2 : `NumpyTensor`
+            Elements whose inner product is calculated.
+
+        Returns
+        -------
+        inner : `field` `element`
+            Inner product of the elements.
+
+        Examples
+        --------
+        >>> space = odl.rn(3)
+        >>> x = space.element([1, 0, 3])
+        >>> y = space.one()
+        >>> space.inner(x, y)
+        4.0
+
+        Weighting is supported, too:
+
+        >>> space_w = odl.rn(3, weighting=[2, 1, 1])
+        >>> x = space_w.element([1, 0, 3])
+        >>> y = space_w.one()
+        >>> space_w.inner(x, y)
+        5.0
+        """
+        return self.weighting.inner(x1, x2)
+
+    def _lincomb(self, a, x1, b, x2, out):
+        """Implement the linear combination of ``x1`` and ``x2``.
+
+        Compute ``out = a*x1 + b*x2`` using optimized
+        BLAS routines if possible.
+
+        This function is part of the subclassing API. Do not
+        call it directly.
+
+        Parameters
+        ----------
+        a, b : `TensorSpace.field` element
+            Scalars to multiply ``x1`` and ``x2`` with.
+        x1, x2 : `NumpyTensor`
+            Summands in the linear combination.
+        out : `NumpyTensor`
+            Tensor to which the result is written.
+
+        Examples
+        --------
+        >>> space = odl.rn(3)
+        >>> x = space.element([0, 1, 1])
+        >>> y = space.element([0, 0, 1])
+        >>> out = space.element()
+        >>> result = space.lincomb(1, x, 2, y, out)
+        >>> result
+        rn(3).element([ 0.,  1.,  3.])
+        >>> result is out
+        True
+        """
+        if self.__use_in_place_ops:
+            assert(out is not None)
+            _lincomb_impl(a, x1, b, x2, out)
+        else:
+            assert(out is None)
+            return self.element(a * x1.data + b * x2.data)
+        
+    def _multiply(self, x1, x2, out):
+        """Compute the entry-wise product ``out = x1 * x2``.
+
+        This function is part of the subclassing API. Do not
+        call it directly.
+
+        Parameters
+        ----------
+        x1, x2 : `NumpyTensor`
+            Factors in the product.
+        out : `NumpyTensor`
+            Element to which the result is written.
+
+        Examples
+        --------
+        >>> space = odl.rn(3)
+        >>> x = space.element([1, 0, 3])
+        >>> y = space.element([-1, 1, -1])
+        >>> space.multiply(x, y)
+        rn(3).element([-1.,  0., -3.])
+        >>> out = space.element()
+        >>> result = space.multiply(x, y, out=out)
+        >>> result
+        rn(3).element([-1.,  0., -3.])
+        >>> result is out
+        True
+        """
+        if out is None:
+            return np.multiply(x1.data, x2.data)
+        else:
+            np.multiply(x1.data, x2.data, out=out.data)
+
+    def _norm(self, x):
+        """Return the norm of ``x``.
+
+        This function is part of the subclassing API. Do not
+        call it directly.
+
+        Parameters
+        ----------
+        x : `NumpyTensor`
+            Element whose norm is calculated.
+
+        Returns
+        -------
+        norm : `float`
+            Norm of the element.
+
+        Examples
+        --------
+        Different exponents result in difference norms:
+
+        >>> space_2 = odl.rn(3, exponent=2)
+        >>> x = space_2.element([3, 0, 4])
+        >>> space_2.norm(x)
+        5.0
+        >>> space_1 = odl.rn(3, exponent=1)
+        >>> x = space_1.element([3, 0, 4])
+        >>> space_1.norm(x)
+        7.0
+
+        Weighting is supported, too:
+
+        >>> space_1_w = odl.rn(3, exponent=1, weighting=[2, 1, 1])
+        >>> x = space_1_w.element([3, 0, 4])
+        >>> space_1_w.norm(x)
+        10.0
+        """
+        return self.weighting.norm(x)
+
+    ################ Methods (magic)  ################
+    def __eq__(self, other):
+        """Return ``self == other``.
+
+        Returns
+        -------
+        equals : bool
+            True if ``other`` is an instance of ``type(self)``
+            with the same `NumpyTensorSpace.shape`, `NumpyTensorSpace.dtype`
+            and `NumpyTensorSpace.weighting`, otherwise False.
+
+        Examples
+        --------
+        >>> space = odl.rn(3)
+        >>> same_space = odl.rn(3, exponent=2)
+        >>> same_space == space
+        True
+
+        Different `shape`, `exponent` or `dtype` all result in different
+        spaces:
+
+        >>> diff_space = odl.rn((3, 4))
+        >>> diff_space == space
+        False
+        >>> diff_space = odl.rn(3, exponent=1)
+        >>> diff_space == space
+        False
+        >>> diff_space = odl.rn(3, dtype='float32')
+        >>> diff_space == space
+        False
+        >>> space == object
+        False
+        """
+        if other is self:
+            return True
+
+        return (super(NumpyTensorSpace, self).__eq__(other) and
+                self.weighting == other.weighting)
+
+    def __hash__(self):
+        """Return ``hash(self)``."""
+        return hash((super(NumpyTensorSpace, self).__hash__(),
+                     self.weighting))
 
     def __repr__(self):
         """Return ``repr(self)``."""
@@ -753,27 +817,6 @@ class NumpyTensorSpace(TensorSpace):
             inner_str += ', ' + weight_str
 
         return '{}({})'.format(ctor_name, inner_str)
-
-    @property
-    def element_type(self):
-        """Type of elements in this space: `NumpyTensor`."""
-        return NumpyTensor
-
-    def is_suitable_scalar(self, s):
-        return type(s) is self.dtype.type
-
-    def as_suitable_scalar(self, s):
-        """Try to convert `s` to a type that can be scalar-multiplied with
-        numpy arrays.
-        """
-        return self.dtype.type(s)
-    
-    @property
-    def np_dtype(self):
-        """Equivalent numpy type of space.type
-        """
-        return self.dtype
-
 
 class NumpyTensor(Tensor):
 
@@ -860,29 +903,6 @@ class NumpyTensor(Tensor):
             Version of this element with given data type.
         """
         return self.space.astype(dtype).element(self.data.astype(dtype))
-
-    @property
-    def data_ptr(self):
-        """A raw pointer to the data container of ``self``.
-
-        Examples
-        --------
-        >>> import ctypes
-        >>> space = odl.tensor_space(3, dtype='uint16')
-        >>> x = space.element([1, 2, 3])
-        >>> arr_type = ctypes.c_uint16 * 3  # C type "array of 3 uint16"
-        >>> buffer = arr_type.from_address(x.data_ptr)
-        >>> arr = np.frombuffer(buffer, dtype='uint16')
-        >>> arr
-        array([1, 2, 3], dtype=uint16)
-
-        In-place modification via pointer:
-
-        >>> arr[0] = 42
-        >>> x
-        tensor_space(3, dtype='uint16').element([42,  2,  3])
-        """
-        return self.data.ctypes.data
 
     def __eq__(self, other):
         """Return ``self == other``.

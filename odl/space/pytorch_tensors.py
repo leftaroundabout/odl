@@ -264,7 +264,7 @@ class PytorchTensorSpace(TensorSpace):
         self.__dtype_as_str = dtype
         self.__dtype = TORCH_DTYPES[dtype]
 
-    def parse_device(self, device):
+    def parse_device(self, device:str):
         """
         Process the device argument 
         This checks that the device requested is available and sets one attribute
@@ -493,22 +493,6 @@ class PytorchTensorSpace(TensorSpace):
         """This space's weighting scheme."""
         return self.__weighting   
 
-    @staticmethod
-    def is_suitable_scalar(self, s):
-        if self.dtype in [torch.complex64, torch.complex128]:
-            return type(s) is complex
-        else:
-            return type(s) is float
-        # Singleton-tensor version:
-        # if not isinstance(s, torch.Tensor):
-        #     return False
-        # elif s.dtype != self._torch_dtype:
-        #     return False
-        # elif s.shape != ():
-        #     return False
-        # else:
-        #     return True
-
     ################ Methods (Non-static) ################
     def as_suitable_scalar(self, s):
         """Try to convert `s` to a type that can be scalar-multiplied with
@@ -523,6 +507,21 @@ class PytorchTensorSpace(TensorSpace):
         else:
             return float(s)
             # return torch.tensor(float(s), dtype=self._torch_dtype)
+
+    def is_suitable_scalar(self, s):
+        if self.dtype in [torch.complex64, torch.complex128]:
+            return type(s) is complex
+        else:
+            return type(s) is float
+        # Singleton-tensor version:
+        # if not isinstance(s, torch.Tensor):
+        #     return False
+        # elif s.dtype != self._torch_dtype:
+        #     return False
+        # elif s.shape != ():
+        #     return False
+        # else:
+        #     return True
 
     def copy(self):
         """Return an identical (deep) copy of this tensor.
