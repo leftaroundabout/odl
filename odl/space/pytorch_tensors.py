@@ -103,10 +103,7 @@ class PytorchTensorSpace(TensorSpace):
             Number of entries per axis for elements in this space. A
             single integer results in a space with rank 1, i.e., 1 axis.
         dtype :
-            Data type of each element. Can be provided in any
-            way the `torch.dtype` function understands, e.g.
-            as built-in type or as a string. For ``None``,
-            the `default_dtype` of this space (``float64``) is used.
+            Data type of each element. Must be provided as a string. Defaults to `float32`.
         device : PyTorch device identifier
             Where to store and process data (i.e. arrays) representing elements
             of this space. Should typically be a 'cuda:i' (cuda) if available, else
@@ -135,6 +132,16 @@ class PytorchTensorSpace(TensorSpace):
             ``norm`` or ``inner``. It also cannot be used in case of
             non-numeric ``dtype``.
 
+        inner : callable, optional
+            The inner product implementation. It must accept two
+            `PytorchTensor` arguments and return an element of the field
+            of the space (usually real or complex number).
+            See ``Notes`` for mathematical requirements.
+
+            This option cannot be combined with ``weight``,
+            ``dist`` or ``norm``. It also cannot be used in case of
+            non-numeric ``dtype``.
+
         norm : callable, optional
             The norm implementation. It must accept a
             `PytorchTensor` argument, return a non-negative real number.
@@ -144,16 +151,6 @@ class PytorchTensorSpace(TensorSpace):
 
             This option cannot be combined with ``weight``,
             ``dist`` or ``inner``. It also cannot be used in case of
-            non-numeric ``dtype``.
-
-        inner : callable, optional
-            The inner product implementation. It must accept two
-            `PytorchTensor` arguments and return an element of the field
-            of the space (usually real or complex number).
-            See ``Notes`` for mathematical requirements.
-
-            This option cannot be combined with ``weight``,
-            ``dist`` or ``norm``. It also cannot be used in case of
             non-numeric ``dtype``.
 
         weighting : optional

@@ -11,7 +11,6 @@
 from __future__ import absolute_import, division, print_function
 from future.utils import native
 
-import ctypes
 from builtins import object
 from functools import partial
 
@@ -92,7 +91,7 @@ class NumpyTensorSpace(TensorSpace):
     .. _Wikipedia article on tensors: https://en.wikipedia.org/wiki/Tensor
     """
 
-    def __init__(self, shape, dtype=None, device = 'cpu', **kwargs):
+    def __init__(self, shape, dtype='float32', device = 'cpu', **kwargs):
         r"""Initialize a new instance.
 
         Parameters
@@ -101,12 +100,12 @@ class NumpyTensorSpace(TensorSpace):
             Number of entries per axis for elements in this space. A
             single integer results in a space with rank 1, i.e., 1 axis.
         dtype :
-            Data type of each element. Can be provided in any
-            way the `numpy.dtype` function understands, e.g.
-            as built-in type or as a string. For ``None``,
-            the `default_dtype` of this space (``float64``) is used.
+            Data type of each element. Must be provided as a string. Defaults to `float32`.
         device :
             Device on which the data is. It must be 'cpu'.
+
+        Other Parameters
+        ----------------
         exponent : positive float, optional
             Exponent of the norm. For values other than 2.0, no
             inner product is defined.
@@ -116,8 +115,39 @@ class NumpyTensorSpace(TensorSpace):
 
             Default: 2.0
 
-        Other Parameters
-        ----------------
+        dist : callable, optional
+            Distance function defining a metric on the space.
+            It must accept two `NumpyTensor` arguments and return
+            a non-negative real number. See ``Notes`` for
+            mathematical requirements.
+
+            By default, ``dist(x, y)`` is calculated as ``norm(x - y)``.
+
+            This option cannot be combined with ``weight``,
+            ``norm`` or ``inner``. It also cannot be used in case of
+            non-numeric ``dtype``.¨
+
+        inner : callable, optional
+            The inner product implementation. It must accept two
+            `NumpyTensor` arguments and return an element of the field
+            of the space (usually real or complex number).
+            See ``Notes`` for mathematical requirements.
+
+            This option cannot be combined with ``weight``,
+            ``dist`` or ``norm``. It also cannot be used in case of
+            non-numeric ``dtype``.
+
+        norm : callable, optional
+            The norm implementation. It must accept a
+            `NumpyTensor` argument, return a non-negative real number.
+            See ``Notes`` for mathematical requirements.
+
+            By default, ``norm(x)`` is calculated as ``inner(x, x)``.
+
+            This option cannot be combined with ``weight``,
+            ``dist`` or ``inner``. It also cannot be used in case of
+            non-numeric ``dtype``.
+
         weighting : optional
             Use weighted inner product, norm, and dist. The following
             types are supported as ``weighting``:
@@ -135,47 +165,12 @@ class NumpyTensorSpace(TensorSpace):
             ``norm`` or ``inner``. It also cannot be used in case of
             non-numeric ``dtype``.
 
-        dist : callable, optional
-            Distance function defining a metric on the space.
-            It must accept two `NumpyTensor` arguments and return
-            a non-negative real number. See ``Notes`` for
-            mathematical requirements.
-
-            By default, ``dist(x, y)`` is calculated as ``norm(x - y)``.
-
-            This option cannot be combined with ``weight``,
-            ``norm`` or ``inner``. It also cannot be used in case of
-            non-numeric ``dtype``.
-
-        norm : callable, optional
-            The norm implementation. It must accept a
-            `NumpyTensor` argument, return a non-negative real number.
-            See ``Notes`` for mathematical requirements.
-
-            By default, ``norm(x)`` is calculated as ``inner(x, x)``.
-
-            This option cannot be combined with ``weight``,
-            ``dist`` or ``inner``. It also cannot be used in case of
-            non-numeric ``dtype``.
-
-        inner : callable, optional
-            The inner product implementation. It must accept two
-            `NumpyTensor` arguments and return an element of the field
-            of the space (usually real or complex number).
-            See ``Notes`` for mathematical requirements.
-
-            This option cannot be combined with ``weight``,
-            ``dist`` or ``norm``. It also cannot be used in case of
-            non-numeric ``dtype``.
-
         kwargs :
             Further keyword arguments are passed to the weighting
             classes.
 
         See Also
         --------
-        odl.space.space_utils.rn : constructor for real tensor spaces
-        odl.space.space_utils.cn : constructor for complex tensor spaces
         odl.space.space_utils.tensor_space :
             constructor for tensor spaces of arbitrary scalar data type
 
@@ -221,17 +216,17 @@ class NumpyTensorSpace(TensorSpace):
         --------
         Explicit initialization with the class constructor:
 
-        >>> space = NumpyTensorSpace(3, float)
+        >>> space = NumpyTensorSpace(3)
         >>> space
         rn(3)
         >>> space.shape
         (3,)
         >>> space.dtype
-        dtype('float64')
+        dtype('float32')
 
         A more convenient way is to use factory functions:
 
-        >>> space = odl.rn(3, weighting=[1, 2, 3])
+        >>> space = odl.tensor_space(3, weighting=[1, 2, 3])
         >>> space
         rn(3, weighting=[1, 2, 3])
         >>> space = odl.tensor_space((2, 3), dtype=int)
