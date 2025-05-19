@@ -492,7 +492,7 @@ class TensorSpace(LinearSpace):
         # Case 2.3: the input is an array like object [[1,2,3],[4,5,6],...]
         # TODO: Add the iterable type instead of list and tuple and the numerics type instead of int, float, complex
         elif isinstance(inp, (int, float, complex, list, tuple)):
-            return wrapped_array(self.array_namespace.asarray(inp, device, copy))
+            return wrapped_array(self.array_namespace.asarray(inp, device=self.device, dtype=self.dtype))
         else:
             raise ValueError    
         
