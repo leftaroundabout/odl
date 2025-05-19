@@ -20,7 +20,7 @@ TENSOR_SPACE_IMPLS = {
     'pytorch': PytorchTensorSpace
     }
 
-__all__ = ("tensor_space")
+__all__ = ("tensor_space", )
 
 def tensor_space(
     shape, dtype="float32", impl="numpy", device="cpu", **kwargs
