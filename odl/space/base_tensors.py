@@ -92,13 +92,13 @@ class TensorSpace(LinearSpace):
             https://data-apis.org/array-api/latest/design_topics/device_support.html#device-support
             for the guidelines on declaring your device
         """
-        self.parse_shape(dtype)
+        self.parse_shape(shape, dtype)
 
         field = self.parse_field(dtype)
         LinearSpace.__init__(self, field)
 
     ################ Init Methods, Non static ################
-    def parse_shape(self, dtype):
+    def parse_shape(self, shape, dtype):
         # Handle shape and dtype, taking care also of dtypes with shape
         try:
             shape, shape_in = tuple(safe_int_conv(s) for s in shape), shape
