@@ -33,6 +33,8 @@ from odl.util import (
 )
 
 from odl.util.utility import (
+    FLOAT_DTYPES,
+    COMPLEX_DTYPES,
     TYPE_PROMOTION_REAL_TO_COMPLEX,
     TYPE_PROMOTION_COMPLEX_TO_REAL,
 )
@@ -388,14 +390,14 @@ class TensorSpace(LinearSpace):
         return self.__weighting
 
     ################ Methods (Non-static) ################
-    def _astype(self, dtype):
+    def _astype(self, dtype:str):
         """Internal helper for `astype`.
 
         Subclasses with differing init parameters should overload this
         method.
         """
         kwargs = {}
-        if is_floating_dtype(dtype):
+        if dtype in FLOAT_DTYPES + COMPLEX_DTYPES:
             # Use weighting only for floating-point types, otherwise, e.g.,
             # `space.astype(bool)` would fail
             weighting = getattr(self, "weighting", None)
@@ -423,8 +425,14 @@ class TensorSpace(LinearSpace):
         if dtype is None:
             # Need to filter this out since Numpy iterprets it as 'float'
             raise ValueError("`None` is not a valid data type")
-
-        dtype = np.dtype(dtype)
+        
+        # Conversion from (str) to (backend.dtype)
+        try:
+            dtype_as_str = dtype
+            dtype = self.available_dtypes[dtype]
+        except KeyError:
+            raise KeyError(f"The dtype must be in {self.available_dtypes.keys()}, but {dtype} was provided")
+        
         if dtype == self.dtype:
             return self
 
@@ -432,16 +440,16 @@ class TensorSpace(LinearSpace):
             # Caching for real and complex versions (exact dtype mappings)
             if dtype == self.__real_dtype:
                 if self.__real_space is None:
-                    self.__real_space = self._astype(dtype)
+                    self.__real_space = self._astype(dtype_as_str)
                 return self.__real_space
             elif dtype == self.__complex_dtype:
                 if self.__complex_space is None:
-                    self.__complex_space = self._astype(dtype)
+                    self.__complex_space = self._astype(dtype_as_str)
                 return self.__complex_space
             else:
-                return self._astype(dtype)
+                return self._astype(dtype_as_str)
         else:
-            return self._astype(dtype)
+            return self._astype(dtype_as_str)
         
     def element(self, inp=None, device=None, copy=True):
         def wrapped_array(arr):
