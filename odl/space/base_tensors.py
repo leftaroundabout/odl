@@ -93,12 +93,31 @@ class TensorSpace(LinearSpace):
             https://data-apis.org/array-api/latest/design_topics/device_support.html#device-support
             for the guidelines on declaring your device
         """
+        # Dtype check and parsing 
+        self.parse_dtype(dtype)
+
         self.parse_shape(shape, dtype)
 
         field = self.parse_field(dtype)
         LinearSpace.__init__(self, field)
 
     ################ Init Methods, Non static ################
+    def parse_dtype(self, dtype:str):
+        """
+        Process the dtype argument. This parses the (str) dtype input argument to a backend.dtype and sets two attributes
+
+        self.dtype_as_str (str)      -> Used for passing dtype information from one backend to another
+        self.__dtype (backend.dtype) -> Actual dtype of the TensorSpace implementation
+
+        Note:
+        The check below is here just in case a user initialise a space directly from this class, which is not recommended
+        """
+        if dtype not in self.available_dtypes:
+            raise ValueError(f"The dtype must be in {self.available_dtypes.keys()}, but {dtype} was provided")
+
+        self.__dtype_as_str = dtype
+        self.__dtype = self.available_dtypes[dtype]
+
     def parse_shape(self, shape, dtype):
         # Handle shape and dtype, taking care also of dtypes with shape
         try:
@@ -219,7 +238,12 @@ class TensorSpace(LinearSpace):
     @property
     def dtype(self):
         """Scalar data type of each entry in an element of this space."""
-        raise NotImplementedError("abstract method")
+        return self.__dtype
+    
+    @property
+    def dtype_as_str(self):
+        """Scalar data type of each entry in an element of this space."""
+        return self.__dtype_as_str
     
     @property
     def examples(self):

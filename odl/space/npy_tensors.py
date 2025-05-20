@@ -234,9 +234,6 @@ class NumpyTensorSpace(TensorSpace):
         """
         super(NumpyTensorSpace, self).__init__(shape, dtype, device)
 
-        # Dtype check and parsing 
-        self.parse_dtype(dtype)
-
         # Device check and parsing
         self.parse_device(device)
 
@@ -251,22 +248,6 @@ class NumpyTensorSpace(TensorSpace):
             raise TypeError("got unknown keyword arguments {}".format(kwargs))
         
     ################ Init Methods, Non static ################
-    def parse_dtype(self, dtype:str):
-        """
-        Process the dtype argument. This parses the (str) dtype input argument to a torch.dtype and sets two attributes
-
-        self.dtype_as_str (str)    -> Used for passing dtype information from one backend to another
-        self.__dtype (np.dtype) -> Actual dtype of the TensorSpace implementation
-
-        Note:
-        The check below is here just in case a user initialise a space directly from this class, which is not recommended
-        """
-        if dtype not in NUMPY_DTYPES:
-            raise ValueError("`dtype` {!r} not supported" "".format(dtype_str(dtype)))
-
-        self.__dtype_as_str = dtype
-        self.__dtype = NUMPY_DTYPES[dtype]
-
     def parse_device(self, device:str):
         """
         Process the device argument 
