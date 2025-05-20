@@ -425,16 +425,6 @@ class NumpyTensorSpace(TensorSpace):
         return self.__device
     
     @property
-    def dtype(self):
-        """Scalar data type of each entry in an element of this space."""
-        return self.__dtype
-
-    @property
-    def dtype_as_str(self):
-        """Scalar data type of each entry in an element of this space as a string."""
-        return self.__dtype_as_str
-    
-    @property
     def exponent(self):
         """Exponent of the norm and the distance."""
         return self.weighting.exponent

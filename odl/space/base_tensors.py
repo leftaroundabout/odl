@@ -282,11 +282,6 @@ class TensorSpace(LinearSpace):
             )
 
         np.random.set_state(rand_state)
-    
-    @property
-    def dtype_as_str(self):
-        """Scalar data type of each entry in an element of this space, represented as a string"""
-        raise NotImplementedError("abstract method")
 
     @property
     def impl(self):
