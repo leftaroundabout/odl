@@ -84,11 +84,11 @@ REPR_PRECISION = 4  # For printing scalars and array entries
 # }
 # TYPE_MAP_C2R.update({k: k for k in TYPE_MAP_R2C.keys()})
 
-BOOLEAN_TYPES = [
+BOOLEAN_DTYPES = [
     "bool"
     ]
 
-INTEGER_TYPES = [
+INTEGER_DTYPES = [
     "int8",
     "int16",
     "int32",
@@ -99,7 +99,7 @@ INTEGER_TYPES = [
     "uint64"
     ]
 
-FLOAT_TYPES = [
+FLOAT_DTYPES = [
     "float32",
     "float64"
 ]
@@ -109,8 +109,8 @@ COMPLEX_DTYPES = [
     "complex128"
 ]
 
-REAL_TYPES = INTEGER_TYPES + FLOAT_TYPES
-AVAILABLE_DTYPES = BOOLEAN_TYPES + INTEGER_TYPES + FLOAT_TYPES + COMPLEX_DTYPES 
+REAL_DTYPES = INTEGER_DTYPES + FLOAT_DTYPES
+AVAILABLE_DTYPES = BOOLEAN_DTYPES + REAL_DTYPES + COMPLEX_DTYPES 
 
 """
 See type promotion rules https://data-apis.org/array-api/latest/API_specification/type_promotion.html#type-promotion
