@@ -447,7 +447,7 @@ class NumpyTensorSpace(TensorSpace):
         advantageous to reduce memory allocations.
         This can be deactivated, mostly for testing purposes, by setting
         `use_in_place_ops = False` when constructing the space."""
-        if self.__use_in_place_ops:
+        if self._use_in_place_ops:
             return SupportedNumOperationParadigms(
                     in_place = NumOperationParadigmSupport.PREFERRED,
                     out_of_place = NumOperationParadigmSupport.SUPPORTED)
@@ -475,6 +475,9 @@ class NumpyTensorSpace(TensorSpace):
     
     def is_suitable_scalar(self, s):
         return type(s) is self.dtype.type
+
+    def get_array_dtype_as_str(self, arr):
+        return arr.dtype.name
 
     ################ Methods (Static) ################
     @staticmethod

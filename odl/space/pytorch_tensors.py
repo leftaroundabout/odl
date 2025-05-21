@@ -559,7 +559,10 @@ class PytorchTensorSpace(TensorSpace):
             raise ValueError(
                 "no default data type defined for field {}" "".format(field)
             )
-
+    def get_array_dtype_as_str(self, arr):
+        """Parsing the dtype as a float is a """
+        return str(arr.dtype).split('.')[-1]
+    
     ################ Methods (Subclassing API)  ################
     def _dist(self, x1, x2):
         """Return the distance between ``x1`` and ``x2``.
