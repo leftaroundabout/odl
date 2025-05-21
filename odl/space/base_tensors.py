@@ -458,12 +458,13 @@ class TensorSpace(LinearSpace):
                     "shape of `inp` not equal to space shape: "
                     "{} != {}".format(arr.shape, self.shape)
                 )
-            ### This is a temporary fix, until pytorch provides the right API for astype()!!
-            # very ugly implementation as of now >:(
+            return_space = self.astype(self.get_array_dtype_as_str(arr))
+
+            ### This is a temporary fix, until pytorch provides the right API for astype()
             try:
-                return self.tensor_type(self, arr.astype(self.dtype))
+                return return_space.tensor_type(return_space, arr.astype(self.dtype))
             except AttributeError:
-                return self.tensor_type(self, torch.asarray(arr, dtype=self.dtype, device=self.device))
+                return return_space.tensor_type(return_space, torch.asarray(arr, dtype=self.dtype, device=self.device))
 
 
         def dlpack_transfer(arr, device=None, copy=True):
@@ -490,7 +491,7 @@ class TensorSpace(LinearSpace):
                     "The data exchange is possible via an explicit copy but copy is set to False."
                 )
             ### This is a temporary fix, until pytorch provides the right API for dlpack with args!!
-            # this should be raised only when using a GPU device, very ugly implementation as of now >:(
+            # The RuntimeError should be raised only when using a GPU device 
             except RuntimeError:
                 if self.impl == 'pytorch':                    
                     return torch.asarray(arr, device=self.device, dtype=self.dtype)
@@ -511,12 +512,15 @@ class TensorSpace(LinearSpace):
 
         # Case 2: input is provided
         # Case 2.1: the input is an ODL OBJECT
+        # ---> The data of the input is transferred to the space's device and data type AND wrapped into the space.
         if hasattr(inp, "odl_tensor"):
             return wrapped_array(dlpack_transfer(inp.data, device, copy))
         # Case 2.2: the input is an object that implements the python array aPI (np.ndarray, torch.Tensor...)
+        # ---> The input is transferred to the space's device and data type AND wrapped into the space.
         elif hasattr(inp, '__array__'):
             return wrapped_array(dlpack_transfer(inp, device, copy))
         # Case 2.3: the input is an array like object [[1,2,3],[4,5,6],...]
+        # ---> The input is transferred to the space's device and data type AND wrapped into the space.
         # TODO: Add the iterable type instead of list and tuple and the numerics type instead of int, float, complex
         elif isinstance(inp, (int, float, complex, list, tuple)):
             return wrapped_array(self.array_namespace.asarray(inp, device=self.device, dtype=self.dtype))
@@ -795,11 +799,21 @@ class Tensor(LinearSpaceElement):
     def shape(self):
         """Number of elements per axis."""
         return self.space.shape
+    
+    @property
+    def device(self):
+        """Data type of each entry."""
+        return self.space.device
 
     @property
     def dtype(self):
         """Data type of each entry."""
         return self.space.dtype
+    
+    @property
+    def dtype_as_str(self):
+        """Data type as a string of each entry."""
+        return self.space.dtype_as_str
 
     @property
     def size(self):
@@ -834,35 +848,63 @@ class Tensor(LinearSpaceElement):
         return self.space.nbytes
 
     ############### Magic functions  ###############
+
+    ############### Arithmetic Operators  ###############
     def __add__(self, other):
+        # If other is an odl_tensor, we delegate the addition to odl.add
         if hasattr(other, "odl_tensor"):
             return odl.add(self, other)
         
-        elif hasattr(other, '__array__'):
-            return odl.add(self, self.space.element(other))
-        
+        # If other is a python numeric type, we return an element of a 
+        # space similar to self.space, but with the data type returned 
+        # by the corresponding operation delegated to the backend.
         elif isinstance(other, (int, float, complex)):
             return self.space.element(self.data + other)
+        else:
+            raise NotImplementedError(f"Arithmetic operation '+' not defined for odl.Tensor and {type(other)}")
+
+    def __mul__(self, other):
+        # If other is an odl_tensor, we delegate the multiplication to 
+        # odl.multiply
+        if hasattr(other, "odl_tensor"):
+            return odl.multiply(self, other)
+        
+        # If other is a python numeric type, we return an element of a 
+        # space similar to self.space, but with the data type returned 
+        # by the corresponding operation delegated to the backend.
+        elif isinstance(other, (int, float, complex)):
+            return self.space.element(self.data * other)
         
         else:
             raise NotImplementedError
-        
+           
     def __sub__(self, other):
+        # If other is an odl_tensor, we delegate the subtraction to odl.subtract
         if hasattr(other, "odl_tensor"):
             return odl.subtract(self, other)
         
-        elif hasattr(other, '__array__'):
-            return odl.subtract(self, self.space.element(other))
-        
+        # If other is a python numeric type, we return an element of a 
+        # space similar to self.space, but with the data type returned 
+        # by the corresponding operation delegated to the backend.
         elif isinstance(other, (int, float, complex)):
             return self.space.element(self.data - other)
         
         else:
             raise NotImplementedError
     
-    def __rsub__(self, other):
-        return (-self).__add__(other)
-
+    def __truediv__(self, other):
+       # If other is an odl_tensor, we delegate the subtraction to odl.subtract
+        if hasattr(other, "odl_tensor"):
+            return odl.subtract(self, other)
+        
+        # If other is a python numeric type, we return an element of a 
+        # space similar to self.space, but with the data type returned 
+        # by the corresponding operation delegated to the backend.
+        elif isinstance(other, (int, float, complex)):
+            return self.space.element(self.data / other)
+        
+        else:
+            raise NotImplementedError
 
     def astype(self, dtype):
         """Return a copy of this element with new ``dtype``.
