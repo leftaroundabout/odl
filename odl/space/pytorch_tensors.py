@@ -838,7 +838,7 @@ class PytorchTensorSpace(TensorSpace):
             or not is_numeric_dtype(self.dtype)
             or self.dtype != self.default_dtype(self.field)
         ):
-            optargs = [("dtype", dtype_str(self.dtype), "")]
+            optargs = [("dtype", self.dtype_as_str, "")]
             if self.dtype in (float, complex, int, bool):
                 optmod = "!s"
             else:
