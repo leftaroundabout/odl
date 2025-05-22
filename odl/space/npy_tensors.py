@@ -647,7 +647,7 @@ class NumpyTensorSpace(TensorSpace):
         >>> result is out
         True
         """
-        if self.__use_in_place_ops:
+        if self._use_in_place_ops:
             assert(out is not None)
             _lincomb_impl(a, x1, b, x2, out)
         else:
