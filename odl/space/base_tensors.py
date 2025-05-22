@@ -436,7 +436,7 @@ class TensorSpace(LinearSpace):
         if dtype == self.dtype:
             return self
 
-        if is_numeric_dtype(self.dtype):
+        if dtype_as_str in FLOAT_DTYPES + COMPLEX_DTYPES:
             # Caching for real and complex versions (exact dtype mappings)
             if dtype == self.__real_dtype:
                 if self.__real_space is None:
@@ -458,22 +458,17 @@ class TensorSpace(LinearSpace):
                     "shape of `inp` not equal to space shape: "
                     "{} != {}".format(arr.shape, self.shape)
                 )
-            return_space = self.astype(self.get_array_dtype_as_str(arr))
-
-            ### This is a temporary fix, until pytorch provides the right API for astype()
-            try:
-                return return_space.tensor_type(return_space, arr.astype(self.dtype))
-            except AttributeError:
-                return return_space.tensor_type(return_space, torch.asarray(arr, dtype=self.dtype, device=self.device))
+            
+            return self.tensor_type(self, arr)
 
 
         def dlpack_transfer(arr, device=None, copy=True):
             # We check that the object implements the dlpack protocol:
-            assert hasattr(inp, "__dlpack_device__") and hasattr(
-                arr, "__dlpack__"
-            ), """The input does not support the DLpack framework. 
-                Please convert it to an object that supports it first. 
-            (cf:https://data-apis.org/array-api/latest/purpose_and_scope.html)"""
+            # assert hasattr(inp, "__dlpack_device__") and hasattr(
+            #     arr, "__dlpack__"
+            # ), """The input does not support the DLpack framework. 
+            #     Please convert it to an object that supports it first. 
+            # (cf:https://data-apis.org/array-api/latest/purpose_and_scope.html)"""
             try:
                 # from_dlpack(inp, device=device, copy=copy)
                 # As of Pytorch 2.7, the pytorch API from_dlpack does not implement the
@@ -509,7 +504,6 @@ class TensorSpace(LinearSpace):
                     self.shape, dtype=self.dtype, device=self.device
                 )
             )
-
         # Case 2: input is provided
         # Case 2.1: the input is an ODL OBJECT
         # ---> The data of the input is transferred to the space's device and data type AND wrapped into the space.
@@ -523,9 +517,17 @@ class TensorSpace(LinearSpace):
         # ---> The input is transferred to the space's device and data type AND wrapped into the space.
         # TODO: Add the iterable type instead of list and tuple and the numerics type instead of int, float, complex
         elif isinstance(inp, (int, float, complex, list, tuple)):
-            return wrapped_array(self.array_namespace.asarray(inp, device=self.device, dtype=self.dtype))
+            return wrapped_array(
+                self.array_namespace.broadcast_to(
+                    self.array_namespace.asarray(inp, device=self.device),
+                    self.shape
+                    )
+                )
         else:
-            raise ValueError    
+            raise ValueError  
+
+    def get_array_dtype_as_str(self):
+        raise NotImplementedError  
         
     def ones(self):
         """Return a tensor of all ones.
@@ -574,6 +576,37 @@ class TensorSpace(LinearSpace):
         raise NotImplementedError("abstract method")
     
     ################ Methods (Subclassing API)  ################
+    def _binary_num_operation(self, x1, x2, combinator:str, out=None):
+        """TODO"""
+        if self.field is None:
+            return NotImplementedError(f"The space has no field. I don't see why that would ever happen.")
+
+        if x1 in self and x2 in self:            
+            return getattr(odl, combinator)(x1, x2, out)
+
+        if isinstance(x1, (int, float, complex)) or isinstance(x2, (int, float, complex)):
+            fn =  getattr(self.array_namespace, combinator)
+            if out is None:
+                if isinstance(x1, (int, float, complex)):
+                    result_data = fn(x1, x2.data)
+                elif isinstance(x2, (int, float, complex)):
+                    result_data = fn(x1.data, x2)
+                    
+                return self.astype(self.get_array_dtype_as_str(result_data)).element(result_data) 
+            else:
+                assert out in self, f"out is not an element of the space."
+                if isinstance(x1, (int, float, complex)):
+                    result_data = fn(x1, x2.data, out.data)
+                elif isinstance(x2, (int, float, complex)):
+                    result_data = fn(x1.data, x2, out.data)
+                    
+                return self.astype(self.get_array_dtype_as_str(result_data)).element(result_data) 
+        else:
+            raise TypeError(
+                f"The {combinator} operation is not supported between {x1} and {x2}." 
+                  + "Wrap both elements in compatible spaces"
+                )
+        
     def _divide(self, x1, x2, out):
         """The entry-wise quotient of two tensors, assigned to ``out``.
 
@@ -848,63 +881,307 @@ class Tensor(LinearSpaceElement):
         return self.space.nbytes
 
     ############### Magic functions  ###############
-
-    ############### Arithmetic Operators  ###############
+    """
+    [+] = implemented
+    [-] = not implemented yet
+    [X] = Will not be implemented
+    The Python array API expects the following operators:
+    #####################################################
+    ################# Arithmetic Operators #################
+    [+] +x: array.__pos__()
+    [+] -x: array.__neg__()
+    [+] x1 +  x2: array.__add__()
+    [+] x1 -  x2: array.__sub__()
+    [+] x1 *  x2: array.__mul__()
+    [+] x1 /  x2: array.__truediv__()
+    [+] x1 // x2: array.__floordiv__()
+    [+] x1 %  x2: array.__mod__()
+    [+] x1 ** x2: array.__pow__()
+    ################# Array Operators #################
+    [X] x1 @ x2: array.__matmul__() -> In ODL, a matmul should be implemented as composition of operators
+    ################# Bitwise Operators #################
+    [X] ~x: array.__invert__()
+    [X] x1 &  x2: array.__and__()
+    [X] x1 |  x2: array.__or__()
+    [X] x1 ^  x2: array.__xor__()
+    [X] x1 << x2: array.__lshift__()
+    [X] x1 >> x2: array.__rshift__()
+    ################# Comparison Operators #################
+    [X] x1 <  x2: array.__lt__() ONLY DEFINED FOR REAL-VALUED DATA TYPES
+    [X] x1 <= x2: array.__le__() ONLY DEFINED FOR REAL-VALUED DATA TYPES
+    [X] x1 >  x2: array.__gt__() ONLY DEFINED FOR REAL-VALUED DATA TYPES
+    [X] x1 >= x2: array.__ge__() ONLY DEFINED FOR REAL-VALUED DATA TYPES
+    [X] x1 == x2: array.__eq__() -> implemented in LinearSpaceElement
+    [X] x1 != x2: array.__ne__() -> implemented in LinearSpaceElement
+    #####################################################
+    ################# In-place Arithmetic Operators #################
+    [+] x1 +=  x2: array.__iadd__()
+    [+] x1 -=  x2: array.__isub__()
+    [+] x1 *=  x2: array.__imul__()
+    [+] x1 /=  x2: array.__itruediv__()
+    [+] x1 //= x2: array.__ifloordiv__()
+    [+] x1 %=  x2: array.__imod__()
+    [+] x1 **= x2: array.__ipow__()
+    ################# In-place Array Operators #################
+    [X] x1 @= x2: array.__imatmul__() -> In ODL, a matmul should be implemented as composition of operators
+    ################# In-place Bitwise Operators #################
+    [X] x1 &=  x2: array.__iand__()
+    [X] x1 |=  x2: array.__ior__()
+    [X] x1 ^=  x2: array.__ixor__()
+    [X] x1 <<= x2: array.__ilshift__()
+    [X] x1 >>= x2: array.__irshift__()
+    ################# Reflected Arithmetic Operators #################
+    [+] x2 +  x1: array.__radd__()
+    [+] x2 -  x1: array.__rsub__()
+    [+] x2 *  x1: array.__rmul__()
+    [+] x2 /  x1: array.__rtruediv__()
+    [+] x2 // x1: array.__rfloordiv__()
+    [+] x2 %  x1: array.__rmod__()
+    [+] x2 ** x1: array.__rpow__()
+    ################# Reflected Array Operators #################
+    [X] x2 @ x1: array.__rmatmul__() -> In ODL, a matmul should be implemented as composition of operators
+    ################# Reflected Bitwise Operators #################
+    [X] x2 &  x1: array.__rand__()
+    [X] x2 |  x1: array.__ror__()
+    [X] x2 ^  x1: array.__rxor__()
+    [X] x2 << x1: array.__rlshift__()
+    [X] x2 >> x1: array.__rrshift__()
+    """
+    ####### Arithmetic Operators #######
+    def __pos__(self):
+        """Return obj positive (+obj)."""
+        return odl.positive(self)
+    
+    def __neg__(self):
+        """Return obj positive (+obj)."""
+        return odl.negative(self)
+    
     def __add__(self, other):
-        # If other is an odl_tensor, we delegate the addition to odl.add
-        if hasattr(other, "odl_tensor"):
-            return odl.add(self, other)
-        
-        # If other is a python numeric type, we return an element of a 
-        # space similar to self.space, but with the data type returned 
-        # by the corresponding operation delegated to the backend.
-        elif isinstance(other, (int, float, complex)):
-            return self.space.element(self.data + other)
-        else:
-            raise NotImplementedError(f"Arithmetic operation '+' not defined for odl.Tensor and {type(other)}")
-
-    def __mul__(self, other):
-        # If other is an odl_tensor, we delegate the multiplication to 
-        # odl.multiply
-        if hasattr(other, "odl_tensor"):
-            return odl.multiply(self, other)
-        
-        # If other is a python numeric type, we return an element of a 
-        # space similar to self.space, but with the data type returned 
-        # by the corresponding operation delegated to the backend.
-        elif isinstance(other, (int, float, complex)):
-            return self.space.element(self.data * other)
-        
-        else:
-            raise NotImplementedError
-           
+        """Return ``self + other``."""
+        return self.space._binary_num_operation(
+            self, other, 'add'
+        )
+    
     def __sub__(self, other):
-        # If other is an odl_tensor, we delegate the subtraction to odl.subtract
-        if hasattr(other, "odl_tensor"):
-            return odl.subtract(self, other)
-        
-        # If other is a python numeric type, we return an element of a 
-        # space similar to self.space, but with the data type returned 
-        # by the corresponding operation delegated to the backend.
-        elif isinstance(other, (int, float, complex)):
-            return self.space.element(self.data - other)
-        
-        else:
-            raise NotImplementedError
+        """Return ``self - other``."""
+        return self.space._binary_num_operation(
+            self, other, 'subtract'
+        )
+    
+    def __mul__(self, other):
+        """Return ``self * other``."""
+        return self.space._binary_num_operation(
+            self, other, 'multiply'
+        )
     
     def __truediv__(self, other):
-       # If other is an odl_tensor, we delegate the subtraction to odl.subtract
-        if hasattr(other, "odl_tensor"):
-            return odl.subtract(self, other)
-        
-        # If other is a python numeric type, we return an element of a 
-        # space similar to self.space, but with the data type returned 
-        # by the corresponding operation delegated to the backend.
-        elif isinstance(other, (int, float, complex)):
-            return self.space.element(self.data / other)
-        
-        else:
-            raise NotImplementedError
+        """Implement ``self / other``."""
+        return self.space._binary_num_operation(
+            self, other, 'divide'
+        )
+    
+    def __floordiv__(self, other):        
+        """Implement ``self // other``."""
+        return self.space._binary_num_operation(
+            self, other, 'floor_divide'
+        )
+
+    def __mod__(self, other):        
+        """Implement ``self % other``."""
+        return self.space._binary_num_operation(
+            self, other, 'remainder'
+        )
+    
+    def __pow__(self, other):
+        """Implement ``self ** other``, element wise"""
+        return self.space._binary_num_operation(
+            self, other, 'pow'
+        )
+    
+    ################# Array Operators #################
+    def __matmul__(self, other):    
+        """Implement ``self @ other``."""
+        raise NotImplementedError
+
+    ################# Bitwise Operators #################
+    def __invert__(self):
+        """Implement ``self.invert``."""
+        raise NotImplementedError
+    
+    def __and__(self, other):
+        """Implement ``self.bitwise_and``."""
+        raise NotImplementedError
+    
+    def __or__(self, other):
+        """Implement ``self.bitwise_or``."""
+        raise NotImplementedError
+    
+    def __xor__(self, other):
+        """Implement ``self.bitwise_xor``."""
+        raise NotImplementedError
+    
+    def __lshift__(self, other):
+        """Implement ``self.bitwise_lshift``."""
+        raise NotImplementedError
+    
+    def __rshift__(self, other):
+        """Implement ``self.bitwise_rshift``."""
+        raise NotImplementedError
+    
+    ################# Comparison Operators #################
+    def __lt__(self, other):
+        """Implement ``self < other``."""
+        raise NotImplementedError
+    
+    def __le__(self, other):
+        """Implement ``self <= other``."""
+        raise NotImplementedError
+    
+    def __gt__(self, other):
+        """Implement ``self > other``."""
+        raise NotImplementedError
+    
+    def __ge__(self, other):
+        """Implement ``self >= other``."""
+        raise NotImplementedError
+    
+     ################# In-place Arithmetic Operators #################
+    def __iadd__(self, other):
+        """Implement ``self += other``."""
+        return self.space._binary_num_operation(
+            self, other, 'add'
+        )
+    
+    def __isub__(self, other):
+        """Implement ``self -= other``."""
+        return self.space._binary_num_operation(
+            self, other, 'subtract'
+        )
+    
+    def __imul__(self, other):
+        """Return ``self *= other``."""
+        return self.space._binary_num_operation(
+            self, other, 'multiply'
+        )
+    
+    def __itruediv__(self, other):
+        """Implement ``self /= other``."""
+        return self.space._binary_num_operation(
+            self, other, 'divide'
+        )
+    
+    def __ifloordiv__(self, other):
+        """Implement ``self //= other``."""
+        return self.space._binary_num_operation(
+            self, other, 'floor_divide'
+        )
+    
+    def __imod__(self, other):
+        """Implement ``self %= other``."""
+        return self.space._binary_num_operation(
+            self, other, 'remainder'
+        )
+    
+    def __ipow__(self, p):
+        """Implement ``self ** p``.
+
+        This is only defined for integer ``p``."""
+        return self.space.element(self.data ** p)
+    
+    ################# In-place Array Operators #################
+    def __imatmul__(self, other):
+        """Implement x1 @= x2 """
+        raise NotImplementedError
+    
+    ################# In-place Bitwise Operators #################    
+    def __iand__(self, other):
+        """Implement ``self.ibitwise_and``."""
+        raise NotImplementedError
+    
+    def __ior__(self, other):
+        """Implement ``self.ibitwise_or``."""
+        raise NotImplementedError
+    
+    def __ixor__(self, other):
+        """Implement ``self.ibitwise_xor``."""
+        raise NotImplementedError
+    
+    def __lshift__(self, other):
+        """Implement ``self.ibitwise_lshift``."""
+        raise NotImplementedError
+    
+    def __irshift__(self, other):
+        """Implement ``self.ibitwise_rshift``."""
+        raise NotImplementedError
+
+    ################# Reflected Arithmetic Operators #################
+    def __radd__(self, other):
+        """Return ``other + self``."""
+        return self.space._binary_num_operation(
+            other, self, 'add'
+        )
+    
+    def __rsub__(self, other):
+        """Return ``other - self``."""
+        return self.space._binary_num_operation(
+            other, self, 'subtract'
+        )
+ 
+    def __rmul__(self, other):
+        """Return ``other * self``."""
+        return self.space._binary_num_operation(
+            other, self, 'multiply'
+        )
+    
+    def __rtruediv__(self, other):
+        """Implement ``other / self``."""
+        return self.space._binary_num_operation(
+             other, self, 'divide'
+        )
+    
+    def __rfloordiv__(self, other):
+        """Implement ``other // self``."""
+        return self.space._binary_num_operation(
+            other, self, 'floor_divide'
+        )
+    
+    def __rmod__(self, other):        
+        """Implement ``other % self``."""
+        return self.space._binary_num_operation(
+            other, self, 'remainder'
+        )
+    
+    def __rpow__(self, other):
+        """Implement ``other ** self``, element wise"""
+        return self.space._binary_num_operation(
+            other, self, 'pow'
+        )
+    
+    ################# Reflected Array Operators #################
+    def __rmatmul__(self, other):
+        """Implement x1 @= x2 """
+        raise NotImplementedError
+    
+    ################# Reflected Bitwise Operators #################    
+    def __rand__(self, other):
+        """Implement ``self.ibitwise_and``."""
+        raise NotImplementedError
+    
+    def __ror__(self, other):
+        """Implement ``self.ibitwise_or``."""
+        raise NotImplementedError
+    
+    def __rxor__(self, other):
+        """Implement ``self.ibitwise_xor``."""
+        raise NotImplementedError
+    
+    def __rshift__(self, other):
+        """Implement ``self.ibitwise_lshift``."""
+        raise NotImplementedError
+    
+    def __rrshift__(self, other):
+        """Implement ``self.ibitwise_rshift``."""
+        raise NotImplementedError
 
     def astype(self, dtype):
         """Return a copy of this element with new ``dtype``.
