@@ -1361,17 +1361,15 @@ class PytorchTensor(Tensor):
 
     def __int__(self):
         """Return ``int(self)``."""
-        return int(self.data)
+        return self.data.int()
 
     def __float__(self):
         """Return ``float(self)``."""
-        return float(self.data)
+        return self.data.float()
 
     def __complex__(self):
         """Return ``complex(self)``."""
-        if self.size != 1:
-            raise TypeError("only size-1 tensors can be converted to " "Python scalars")
-        return complex(self.data.ravel()[0])
+        return torch.complex(self.data, self.space.zeros())
 
 
 def _weighting(weights, exponent):
