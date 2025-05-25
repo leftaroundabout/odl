@@ -577,12 +577,45 @@ class TensorSpace(LinearSpace):
     
     ################ Methods (Subclassing API)  ################
     def _binary_num_operation(self, x1, x2, combinator:str, out=None):
-        """TODO"""
-        if self.field is None:
-            return NotImplementedError(f"The space has no field. I don't see why that would ever happen.")
+        """
+        Internal helper function to implement the __magic_functions__ (such as __add__).
 
-        if x1 in self and x2 in self:            
-            return getattr(odl, combinator)(x1, x2, out)
+        Parameters
+        ----------
+        x1 : TensorSpaceElement, int, float, complex
+            Left operand
+        x2 : TensorSpaceElement, int, float, complex
+            Right operand
+        combinator: str
+            Attribute of the array namespace
+        out : TensorSpaceElement, Optional
+            LinearSpaceElement for out-of-place operations
+
+        Returns
+        -------
+        TensorSpaceElement
+            The result of the operation `combinator` wrapped in a space with the right datatype.
+
+        Notes:
+            The dtype of the returned TensorSpaceElement (and the space that wraps it) is infered 
+            from the dtype of the array returned by the backend in which the TensorSpaceElement is 
+            implemented. \n
+            In order to minimise the expensive operations performed under the hood, i.e clearly 
+            unspecified by the user, cross-backend AND cross-devices operations are NOT allowed. \n
+            -> 1j + TensorSpaceElement(dtype='float32') IS supported \n
+            -> TensorSpaceElement(device=device1) + TensorSpaceElement(device=device2) IS NOT supported \n
+            -> TensorSpaceElement(impl=impl1) + TensorSpaceElement(impl=imp2) IS NOT supported \n
+
+        The logic is as follows:
+        1) if either of the operands are Python numeric types (int, float complex)
+            -> the operation is performed on the backend of the TensorSpaceElement and the dtype infered from it.
+        2) if the two operands are TensorSpaceElements
+            -> the operation is delegated to the general odl.combinator which performs the checks on space shape and 
+            device consistency.
+
+        """
+        if self.field is None:
+            return NotImplementedError(f"The space has no field.")
 
         if isinstance(x1, (int, float, complex)) or isinstance(x2, (int, float, complex)):
             fn =  getattr(self.array_namespace, combinator)
@@ -592,7 +625,6 @@ class TensorSpace(LinearSpace):
                 elif isinstance(x2, (int, float, complex)):
                     result_data = fn(x1.data, x2)
                     
-                return self.astype(self.get_array_dtype_as_str(result_data)).element(result_data) 
             else:
                 assert out in self, f"out is not an element of the space."
                 if isinstance(x1, (int, float, complex)):
@@ -600,12 +632,15 @@ class TensorSpace(LinearSpace):
                 elif isinstance(x2, (int, float, complex)):
                     result_data = fn(x1.data, x2, out.data)
                     
-                return self.astype(self.get_array_dtype_as_str(result_data)).element(result_data) 
+            return self.astype(self.get_array_dtype_as_str(result_data)).element(result_data) 
+
+        assert isinstance(x1, Tensor), 'Left operand is not an ODL Tensor'
+        assert isinstance(x2, Tensor), 'Right operand is not an ODL Tensor'
+
+        if out is None:     
+            return getattr(odl, combinator)(x1, x2)
         else:
-            raise TypeError(
-                f"The {combinator} operation is not supported between {x1} and {x2}." 
-                  + "Wrap both elements in compatible spaces"
-                )
+            return getattr(odl, combinator)(x1, x2, out)
         
     def _divide(self, x1, x2, out):
         """The entry-wise quotient of two tensors, assigned to ``out``.
