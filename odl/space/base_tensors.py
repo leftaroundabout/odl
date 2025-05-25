@@ -1117,11 +1117,11 @@ class Tensor(LinearSpaceElement):
             self, other, 'remainder'
         )
     
-    def __ipow__(self, p):
-        """Implement ``self ** p``.
-
-        This is only defined for integer ``p``."""
-        return self.space.element(self.data ** p)
+    def __ipow__(self, other):
+        """Implement ``self *= other``, element wise"""
+        return self.space._binary_num_operation(
+            self, other, 'pow'
+        )
     
     ################# In-place Array Operators #################
     def __imatmul__(self, other):
