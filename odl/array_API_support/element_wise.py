@@ -75,14 +75,12 @@ def _apply_element_wise(x1, operation: str, out=None, **kwargs):
 
     if out is not None:
         assert x1.space.shape == out.space.shape, f"The shapes of x1 {x1.space.shape} and out {out.space.shape} differ, cannot perform {operation}"
-        # assert x1.space.dtype == out.space.dtype, f"The dtype of x1 {x1.space.dtype} and out {out.space.dtype} differ, cannot perform {operation}"
         assert x1.space.device == out.space.device, f"The devices of x1 {x1.space.device} and out {out.space.device} differ, cannot perform {operation}"
         out = out.data
     
     if "x2" in kwargs:
         x2 = kwargs["x2"]
         assert x1.space.shape == x2.space.shape, f"The shapes of x1 {x1.space.shape} and x2 {x2.space.shape} differ, cannot perform {operation}"
-        # assert x1.space.dtype == x2.space.dtype, f"The dtype of x1 {x1.space.dtype} and x2 {x2.space.dtype} differ, cannot perform {operation}"
         assert x1.space.device == x2.space.device, f"The devices of x1 {x1.space.device} and x2 {x2.space.device} differ, cannot perform {operation}"
         result = element_wise_function(x1.data, x2.data, out=out)
     else:
