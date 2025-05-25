@@ -1359,21 +1359,6 @@ class PytorchTensor(Tensor):
             self.data.conj(out.data)
             return out
 
-    def __ipow__(self, other):
-        """Return ``self **= other``."""
-        try:
-            if other == int(other):
-                return super(PytorchTensor, self).__ipow__(other)
-        except TypeError:
-            pass
-
-        torch.pow(self.data, other, out=self.data)
-        return self
-
-    def __rmul__(self, other):
-        result = self.space.element(other * self.data)
-        return result
-
     def __int__(self):
         """Return ``int(self)``."""
         return int(self.data)
