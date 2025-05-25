@@ -1311,17 +1311,6 @@ class NumpyTensor(Tensor):
             self.data.conj(out.data)
             return out
 
-    def __ipow__(self, other):
-        """Return ``self **= other``."""
-        try:
-            if other == int(other):
-                return super(NumpyTensor, self).__ipow__(other)
-        except TypeError:
-            pass
-
-        np.power(self.data, other, out=self.data)
-        return self
-
     def __int__(self):
         """Return ``int(self)``."""
         return int(self.data)
