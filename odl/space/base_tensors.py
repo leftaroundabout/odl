@@ -17,7 +17,8 @@ import numpy as np
 import torch
 import odl
 from odl.util.npy_compat import AVOID_UNNECESSARY_COPY
-
+from .weighting_entry_points import space_weighting
+from .new_weighting import Weighting
 from odl.set.sets import ComplexNumbers, RealNumbers
 from odl.set.space import LinearSpace, LinearSpaceElement
 from odl.util import (
@@ -76,7 +77,7 @@ class TensorSpace(LinearSpace):
     .. _Wikipedia article on tensors: https://en.wikipedia.org/wiki/Tensor
     """
 
-    def __init__(self, shape, dtype, device):
+    def __init__(self, shape, dtype, **kwargs):
         """Initialize a new instance.
 
         Parameters
@@ -90,15 +91,13 @@ class TensorSpace(LinearSpace):
             as built-in type or as a string.
             For a data type with a ``dtype.shape``, these extra dimensions
             are added *to the left* of ``shape``.
-        device :
-            Device on which the data should be stored. Please see:
-            https://data-apis.org/array-api/latest/design_topics/device_support.html#device-support
-            for the guidelines on declaring your device
         """
         # Dtype check and parsing 
         self.parse_dtype(dtype)
 
         self.parse_shape(shape, dtype)
+
+        self.parse_weighting(**kwargs)
 
         field = self.parse_field(dtype)
         LinearSpace.__init__(self, field)
@@ -154,6 +153,22 @@ class TensorSpace(LinearSpace):
         else:
             field = None
         return field
+    
+    def parse_weighting(self, **kwargs):
+        weighting = kwargs.get("weighting", None)      
+        if weighting is None:
+            self.__weighting = space_weighting(self.impl, weight=1.0, exponent=2.0)
+        else:
+            if issubclass(type(weighting), Weighting):
+                if weighting.impl != self.impl:
+                    raise ValueError(
+                        "`weighting.impl` must be 'pytorch', "
+                        "`got {!r}".format(weighting.impl)
+                    )
+                self.__weighting = weighting
+            else:
+                raise TypeError(f"The weighting must be of {Weighting} type, but {type(weighting)} was provided")
+                
 
     ################ Properties ################
     @property

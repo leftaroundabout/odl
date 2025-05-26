@@ -228,20 +228,13 @@ class PytorchTensorSpace(TensorSpace):
         >>> space.dtype
         dtype('float32')
         """
-        super(PytorchTensorSpace, self).__init__(shape, dtype, device)
+        super(PytorchTensorSpace, self).__init__(shape, dtype, **kwargs)
 
         # Device check and parsing
         self.parse_device(device)
 
-        # Weighting Check and parsing
-        self.kwargs = self.parse_weighting(kwargs)
-
         # In-place ops check
         self._use_in_place_ops = kwargs.pop("use_in_place_ops", True)
-
-        # Make sure there are no leftover kwargs
-        if kwargs:
-            raise TypeError("got unknown keyword arguments {}".format(kwargs))
 
     ################ Init Methods, Non static ################
     def parse_device(self, device:str):
@@ -256,76 +249,6 @@ class PytorchTensorSpace(TensorSpace):
             assert device in devices_list, f"Wrong device specification, must be in {devices_list}, but {device} was provided"
         
         self.__device = torch.device(device)
-    
-    def parse_weighting(self, kwargs):
-        dist = kwargs.pop("dist", None)
-        norm = kwargs.pop("norm", None)
-        inner = kwargs.pop("inner", None)
-        weighting = kwargs.pop("weighting", None)
-        exponent = kwargs.pop("exponent", getattr(weighting, "exponent", 2.0))
-
-        if exponent != 2.0 and any(x is not None for x in (dist, norm, inner)):
-            raise ValueError(
-                "cannot use any of `dist`, `norm` or `inner` " "for exponent != 2"
-            )
-        # Check validity of option combination (0 or 1 may be provided)
-        num_extra_args = sum(a is not None for a in (dist, norm, inner, weighting))
-        if num_extra_args > 1:
-            raise ValueError(
-                "invalid combination of options `weighting`, "
-                "`dist`, `norm` and `inner`"
-            )
-        
-        if weighting is not None:
-            if isinstance(weighting, Weighting):
-                if weighting.impl != "pytorch":
-                    raise ValueError(
-                        "`weighting.impl` must be 'pytorch', "
-                        "`got {!r}".format(weighting.impl)
-                    )
-                if weighting.exponent != exponent:
-                    raise ValueError(
-                        "`weighting.exponent` conflicts with "
-                        "`exponent`: {} != {}"
-                        "".format(weighting.exponent, exponent)
-                    )
-                self.__weighting = weighting
-            else:
-                self.__weighting = _weighting(weighting, exponent)
-
-            # Check (afterwards) that the weighting input was sane
-            if isinstance(self.weighting, PytorchTensorSpaceArrayWeighting):
-                if self.weighting.array.dtype == object:
-                    raise ValueError(
-                        "invalid `weighting` argument: {}" "".format(weighting)
-                    )
-
-                elif not torch.can_cast(self.weighting.array.dtype, self.dtype):
-                    raise ValueError(
-                        "cannot cast from `weighting` data type {} to "
-                        "the space `dtype` {}"
-                        "".format(
-                            dtype_str(self.weighting.array.dtype), dtype_str(self.dtype)
-                        )
-                    )
-                if self.weighting.array.shape != self.shape:
-                    raise ValueError(
-                        "array-like weights must have same "
-                        "shape {} as this space, got {}"
-                        "".format(self.shape, self.weighting.array.shape)
-                    )
-
-        elif dist is not None:
-            self.__weighting = PytorchTensorSpaceCustomDist(dist)
-        elif norm is not None:
-            self.__weighting = PytorchTensorSpaceCustomNorm(norm)
-        elif inner is not None:
-            self.__weighting = PytorchTensorSpaceCustomInner(inner)
-        else:
-            # No weighting, i.e., weighting with constant 1.0
-            self.__weighting = PytorchTensorSpaceConstWeighting(1.0, exponent)
-
-        return kwargs
 
     ################ Properties ################
     @property
@@ -466,12 +389,7 @@ class PytorchTensorSpace(TensorSpace):
     @property
     def tensor_type(self):
         """Type of ODL tensor associated with the Space"""
-        return PytorchTensor
-    
-    @property
-    def weighting(self):
-        """This space's weighting scheme."""
-        return self.__weighting   
+        return PytorchTensor   
 
     ################ Methods (Non-static) ################    
     def as_suitable_scalar(self, s):
