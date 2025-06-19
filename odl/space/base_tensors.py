@@ -115,7 +115,7 @@ class TensorSpace(LinearSpace):
         """
         ### We check if the datatype has been provided in a "sane" way, 
         # 1) a Python scalar type
-        avail_dtypes = self.available_dtypes
+        avail_dtypes = self.available_dtypes()
         if isinstance(dtype, (int, float, complex)):
             self.__dtype_identifier = str(dtype)
             self.__dtype = avail_dtypes[dtype] 
@@ -157,14 +157,14 @@ class TensorSpace(LinearSpace):
             field = RealNumbers()
             self.__real_dtype = self.dtype
             self.__real_space = self
-            self.__complex_dtype = self.available_dtypes[
+            self.__complex_dtype = self.available_dtypes()[
                 TYPE_PROMOTION_REAL_TO_COMPLEX[self.dtype_identifier]
             ]
             
             self.__complex_space = None  # Set in first call of astype
         elif self.dtype_identifier in TYPE_PROMOTION_COMPLEX_TO_REAL:
             field = ComplexNumbers()
-            self.__real_dtype = self.available_dtypes[
+            self.__real_dtype = self.available_dtypes()[
                 TYPE_PROMOTION_COMPLEX_TO_REAL[self.dtype_identifier]
             ]
             self.__real_space = None  # Set in first call of astype
@@ -273,8 +273,8 @@ class TensorSpace(LinearSpace):
 
         return TensorSpacebyaxis()
     
-    @property
-    def available_dtypes(self) -> Dict:
+    @classmethod
+    def available_dtypes(cls) -> Dict:
         """Available types of the tensor space implementation
         """
         raise NotImplementedError("abstract method")
@@ -490,7 +490,7 @@ class TensorSpace(LinearSpace):
             # Need to filter this out since Numpy iterprets it as 'float'
             raise ValueError('`None` is not a valid data type')
         
-        avail_dtypes = self.available_dtypes
+        avail_dtypes = self.available_dtypes()
 
         ### We check if the datatype has been provided in a "sane" way, 
         # 1) a Python scalar type
@@ -536,7 +536,8 @@ class TensorSpace(LinearSpace):
         else:
             return self._astype(dtype_identifier)
         
-    def default_dtype(self, field=None):
+    @classmethod
+    def default_dtype(cls, field=None):
         """Return the default data type for a given field.
 
         This method should be overridden by subclasses.
@@ -554,9 +555,9 @@ class TensorSpace(LinearSpace):
             Backend data type specifier.
         """
         if field is None or field == RealNumbers():
-            return self.available_dtypes['float32']
+            return cls.available_dtypes()['float32']
         elif field == ComplexNumbers():
-           return self.available_dtypes['complex64']
+           return cls.available_dtypes()['complex64']
         else:
             raise ValueError('no default data type defined for field {}'
                              ''.format(field))
@@ -1117,7 +1118,8 @@ class TensorSpace(LinearSpace):
         else:
             return getattr(odl, combinator)(x1, x2, out)
         
-    def get_dtype_identifier(self, **kwargs):
+    @classmethod
+    def get_dtype_identifier(cls, **kwargs):
         raise NotImplementedError  
 
 class Tensor(LinearSpaceElement):

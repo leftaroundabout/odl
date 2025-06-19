@@ -250,8 +250,8 @@ class NumpyTensorSpace(TensorSpace):
         """
         return np.ndarray
     
-    @property
-    def available_dtypes(self):
+    @classmethod
+    def available_dtypes(cls):
         return NUMPY_DTYPES
     
     @property
@@ -265,7 +265,8 @@ class NumpyTensorSpace(TensorSpace):
         return 'numpy'
 
     ######### public methods #########
-    def get_dtype_identifier(self, **kwargs):
+    @classmethod
+    def get_dtype_identifier(cls, **kwargs):
         if 'array' in kwargs:
             assert 'dtype' not in kwargs, 'array and dtype are multually exclusive parameters'
             return kwargs['array'].dtype.name
