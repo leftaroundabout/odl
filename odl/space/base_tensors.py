@@ -83,36 +83,17 @@ class TensorSpace(LinearSpace):
             For a data type with a ``dtype.shape``, these extra dimensions
             are added *to the left* of ``shape``.
         """
-        # Handle shape and dtype, taking care also of dtypes with shape        
-        self.parse_dtype(dtype)
 
-        self.parse_shape(shape, dtype)
+        # Process the dtype argument. This parses the (str or Number) dtype input
+        # argument to a backend.dtype and sets two attributes.
 
-        self.parse_device(device)
+        # self.dtype_identifier (str)  -> Used for passing dtype information from one backend to another
+        # self.__dtype (backend.dtype) -> Actual dtype of the TensorSpace implementation
 
-        self.__use_in_place_ops = kwargs.pop('use_in_place_ops', True)
-  
-        self.parse_weighting(**kwargs)
+        # Note:
+        # The check below is here just in case a user initialise a space directly from this class,
+        # which is not recommended
 
-        field = self.parse_field()
-
-        LinearSpace.__init__(self, field)
-
-    ################ Init Methods, Non static ################
-    def parse_device(self, device:str):
-        odl.check_device(self.impl, device)
-        self.__device = device 
-
-    def parse_dtype(self, dtype:str | int | float | complex):
-        """
-        Process the dtype argument. This parses the (str or Number) dtype input argument to a backend.dtype and sets two attributes
-
-        self.dtype_identifier (str)      -> Used for passing dtype information from one backend to another
-        self.__dtype (backend.dtype) -> Actual dtype of the TensorSpace implementation
-
-        Note:
-        The check below is here just in case a user initialise a space directly from this class, which is not recommended
-        """
         ### We check if the datatype has been provided in a "sane" way, 
         # 1) a Python scalar type
         avail_dtypes = self.available_dtypes()
@@ -134,7 +115,6 @@ class TensorSpace(LinearSpace):
         else:
             raise ValueError(f"The dtype must be in {self.available_dtypes.keys()} or must be a dtype of the backend, but {dtype} was provided")
 
-    def parse_shape(self, shape, dtype):
         # Handle shape and dtype, taking care also of dtypes with shape
         try:
             shape, shape_in = tuple(safe_int_conv(s) for s in shape), shape
@@ -151,30 +131,13 @@ class TensorSpace(LinearSpace):
         # <!> this is likely to break in Pytorch
         self.__shape = np.dtype(dtype).shape + shape
 
-    def parse_field(self):
-        if self.dtype_identifier in TYPE_PROMOTION_REAL_TO_COMPLEX:
-            # real includes non-floating-point like integers
-            field = RealNumbers()
-            self.__real_dtype = self.dtype
-            self.__real_space = self
-            self.__complex_dtype = self.available_dtypes()[
-                TYPE_PROMOTION_REAL_TO_COMPLEX[self.dtype_identifier]
-            ]
-            
-            self.__complex_space = None  # Set in first call of astype
-        elif self.dtype_identifier in TYPE_PROMOTION_COMPLEX_TO_REAL:
-            field = ComplexNumbers()
-            self.__real_dtype = self.available_dtypes()[
-                TYPE_PROMOTION_COMPLEX_TO_REAL[self.dtype_identifier]
-            ]
-            self.__real_space = None  # Set in first call of astype
-            self.__complex_dtype = self.dtype
-            self.__complex_space = self
-        else:
-            field = None
-        return field
-    
-    def parse_weighting(self, **kwargs):
+        # Process the device argument. This amounts only to checking it is compatible
+        # with the implementation backend.
+        odl.check_device(self.impl, device)
+        self.__device = device
+
+        self.__use_in_place_ops = kwargs.pop('use_in_place_ops', True)
+  
         weighting = kwargs.pop("weighting", None)    
         if weighting is None:
             self.__weighting = odl.space_weighting(impl=self.impl, device=self.device, **kwargs)
@@ -203,7 +166,30 @@ class TensorSpace(LinearSpace):
                     f"""Wrong type of 'weighting' argument. Only floats, array-like and odl.Weightings are accepted 
                     """
                     )
-    
+
+        if self.dtype_identifier in TYPE_PROMOTION_REAL_TO_COMPLEX:
+            # real includes non-floating-point like integers
+            field = RealNumbers()
+            self.__real_dtype = self.dtype
+            self.__real_space = self
+            self.__complex_dtype = self.available_dtypes()[
+                TYPE_PROMOTION_REAL_TO_COMPLEX[self.dtype_identifier]
+            ]
+            
+            self.__complex_space = None  # Set in first call of astype
+        elif self.dtype_identifier in TYPE_PROMOTION_COMPLEX_TO_REAL:
+            field = ComplexNumbers()
+            self.__real_dtype = self.available_dtypes()[
+                TYPE_PROMOTION_COMPLEX_TO_REAL[self.dtype_identifier]
+            ]
+            self.__real_space = None  # Set in first call of astype
+            self.__complex_dtype = self.dtype
+            self.__complex_space = self
+        else:
+            field = None
+
+        LinearSpace.__init__(self, field)
+
     ########## Attributes ##########
     @property
     def array_constructor(self):
