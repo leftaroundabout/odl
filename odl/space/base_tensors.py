@@ -115,17 +115,18 @@ class TensorSpace(LinearSpace):
         """
         ### We check if the datatype has been provided in a "sane" way, 
         # 1) a Python scalar type
+        avail_dtypes = self.available_dtypes
         if isinstance(dtype, (int, float, complex)):
             self.__dtype_identifier = str(dtype)
-            self.__dtype = self.available_dtypes[dtype] 
+            self.__dtype = avail_dtypes[dtype] 
         # 2) as a string
-        if dtype in self.available_dtypes.keys():
+        if dtype in avail_dtypes.keys():
             self.__dtype_identifier = dtype
-            self.__dtype = self.available_dtypes[dtype]
-        ### If the check has failed, i.e the dtype is not a Key of the self.available_dtypes dict or a python scalar, we try to parse the dtype 
+            self.__dtype = avail_dtypes[dtype]
+        ### If the check has failed, i.e the dtype is not a Key of the available_dtypes dict or a python scalar, we try to parse the dtype 
         ### as a string using the self.get_dtype_identifier(dtype=dtype) call: This is for the situation where the dtype passed is
-        ### in the .values() of self.available_dtypes dict (something like 'numpy.float32')
-        elif dtype in self.available_dtypes.values():
+        ### in the .values() of available_dtypes dict (something like 'numpy.float32')
+        elif dtype in avail_dtypes.values():
             self.__dtype_identifier = self.get_dtype_identifier(dtype=dtype)
             self.__dtype = dtype
             # If that fails, we throw an error: the dtype is not a python scalar dtype, not a string describing the dtype or the 
@@ -489,31 +490,33 @@ class TensorSpace(LinearSpace):
             # Need to filter this out since Numpy iterprets it as 'float'
             raise ValueError('`None` is not a valid data type')
         
+        avail_dtypes = self.available_dtypes
+
         ### We check if the datatype has been provided in a "sane" way, 
         # 1) a Python scalar type
         if isinstance(dtype, (int, float, complex)):
             dtype_identifier = str(dtype)
-            dtype = self.available_dtypes[dtype]
+            dtype = avail_dtypes[dtype]
         # 2) as a string
-        elif dtype in self.available_dtypes.keys():
+        elif dtype in avail_dtypes.keys():
             dtype_identifier = dtype
-            dtype = self.available_dtypes[dtype]
-        ### If the check has failed, i.e the dtype is not a Key of the self.available_dtypes dict or a python scalar, we try to parse the dtype 
+            dtype = avail_dtypes[dtype]
+        ### If the check has failed, i.e the dtype is not a Key of the avail_dtypes dict or a python scalar, we try to parse the dtype 
         ### as a string using the self.get_dtype_identifier(dtype=dtype) call: This is for the situation where the dtype passed is
-        ### in the .values() of self.available_dtypes dict (something like 'numpy.float32')
-        elif self.get_dtype_identifier(dtype=dtype) in self.available_dtypes:
+        ### in the .values() of avail_dtypes dict (something like 'numpy.float32')
+        elif self.get_dtype_identifier(dtype=dtype) in avail_dtypes:
             dtype_identifier = self.get_dtype_identifier(dtype=dtype)
-            dtype = self.available_dtypes[dtype_identifier]
+            dtype = avail_dtypes[dtype_identifier]
             # If that fails, we throw an error: the dtype is not a python scalar dtype, not a string describing the dtype or the 
             # backend call to parse the dtype has failed.
         else:
-            raise ValueError(f"The dtype must be in {self.available_dtypes.keys()} or must be a dtype of the backend, but {dtype} was provided")
+            raise ValueError(f"The dtype must be in {avail_dtypes.keys()} or must be a dtype of the backend, but {dtype} was provided")
 
         # try:
         #     dtype_identifier = dtype
-        #     dtype = self.available_dtypes[dtype]
+        #     dtype = avail_dtypes[dtype]
         # except KeyError:
-        #     raise KeyError(f"The dtype must be in {self.available_dtypes.keys()}, but {dtype} was provided")
+        #     raise KeyError(f"The dtype must be in {avail_dtypes.keys()}, but {dtype} was provided")
         
         if dtype == self.dtype:
             return self
