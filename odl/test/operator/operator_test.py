@@ -54,10 +54,14 @@ class MultiplyAndSquareOp(Operator):
         self.matrix = matrix
 
     def _call(self, x, out=None):
+        out_of_place = False
         if out is None:
+            out_of_place = True
             out = self.range.element()
         out[:] = np.dot(self.matrix, x.data)
         out **= 2
+        if out_of_place:
+            return out
 
     def derivative(self, x):
         return 2 * odl.MatrixOperator(self.matrix)
