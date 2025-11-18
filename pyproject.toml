@@ -1,0 +1,166 @@
+[build-system]
+requires = ["setuptools>=61.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "odl"
+description = "Operator Discretization Library"
+authors = [{name = "Jonas Adler", email = "odl@math.kth.se"}, {name = "Holger Kohr"}, {name = "and the ODL Contributors"}]
+license = {text = "MPL-2.0"}
+keywords = ["research", "development", "mathematics", "prototyping", "imaging", "tomography"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "setuptools >=65.6",
+    "future >=0.16",
+    "packaging >=17.0",
+    "array-api-compat >=1.12",
+    "numpy >=2.3",
+    "scipy >=1.15",
+    "pytest>=9.0.1",
+    "astra-toolbox>=2.4.0",
+    "matplotlib>=3.10.7",
+]
+dynamic = ["version"]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+# See https://pypi.org/classifiers/
+
+[project.urls]
+Homepage = "https://github.com/odlgroup/odl"
+Download = "https://github.com/odlgroup/odl/archive/master.zip"
+
+[project.optional-dependencies]
+testing = [
+    'pytest >=3.1, <5.0 ; python_version <= "2.7"',
+    'pytest >=5.4.0 ; python_version >= "3"',
+    "coverage >=4.0",
+    "coveralls",
+]
+all = [
+    'pytest >=3.1, <5.0 ; python_version <= "2.7"',
+    'pytest >=5.4.0 ; python_version >= "3"',
+    "coverage >=4.0",
+    "coveralls",
+    "matplotlib",
+    "pyfftw",
+    "pywavelets >=1.8",
+    "scikit-image >= 0.25",
+    "astra-toolbox >=2.4",
+]
+
+[project.entry-points]
+pytest11 = {odl_plugins = "odl.core.util.pytest_config"}
+
+[tool.setuptools]
+include-package-data = true
+platforms = ["any"]
+license-files = ["LICENSE"]
+
+[tool.setuptools.packages.find]
+exclude = [
+    "doc",
+    "examples",
+    "conda",
+    "tools",
+]
+namespaces = false
+
+[tool.setuptools.package-data]
+tests = ["odl/test", "odl/pytest.ini"]
+
+[tool.setuptools.dynamic]
+version = {file = ["odl/VERSION"]}
+
+[tool.distutils.bdist_wheel]
+universal = 1
+
+[tool.pytest.ini_options]
+testpaths = ["odl"]
+doctest_optionflags = "NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL ELLIPSIS"
+addopts = "--doctest-modules --strict-markers"
+xfail_strict = true
+
+[tool.isort]
+# Options: https://github.com/timothycrosley/isort#configuring-isort
+line_length = "79"
+multi_line_output = "4"
+
+[tool.pycodestyle]
+ignore = "E402, E741, W503, W504"
+max-line-length = "79"
+statistics = "True"
+exclude = """
+.git
+__init__.py"""
+
+[tool.flake8]
+# Options: http://flake8.pycqa.org/en/latest/user/configuration.html
+# Error codes: http://flake8.pycqa.org/en/latest/user/error-codes.html
+max-line-length = "79"
+exclude = """
+.git
+__pycache__"""
+
+[tool.coverage.run]
+branch = false
+include = ["odl/*"]
+omit = [
+    "*/__init__.py",
+    "odl/test/*",
+    "odl/diagnostics/*",
+    "odl/space/entry_points.py",
+    "odl/util/graphics.py",
+    "odl/util/npy_compat.py",
+    "odl/util/pytest_config.py",
+    "odl/util/testutils.py",
+    # Omit until we add ASTRA to our CI pipelines
+    "odl/tomo/operators/ray_trafo.py",
+    "odl/tomo/backends/*",
+]
+
+[tool.coverage.report]
+# Regexes for lines to exclude from consideration
+exclude_lines = [
+    # Have to re-enable the standard pragma
+    "pragma: no cover",
+    # Don't complain if tests don't hit defensive assertion code:
+    "assert False",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "return NotImplemented",
+    # Skip imports and __all__
+    "import *",
+    "__all__",
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if False:",
+    "if __name__ == '__main__':",
+]
+ignore_errors = true
+
+[tool.coverage.html]
+directory = "htmlcov"
