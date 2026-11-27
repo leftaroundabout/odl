@@ -1100,7 +1100,7 @@ class TensorSpace(LinearSpace):
         >>> result is out
         True
         """
-        return odl.add(a*x1, b*x2, out)
+        return odl.add(odl.multiply(a,x1), odl.multiply(b,x2), out)
 
     def _multiply(self, x1, x2, out):
         """Compute the entry-wise product ``out = x1 * x2``.
